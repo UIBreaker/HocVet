@@ -1,5 +1,6 @@
 @echo off
-title Smart Operation [Pixel Edition] - Tu Dong Hoa HIS
+chcp 65001 >nul
+title Học Vẹt - Tu Dong Hoa HIS
 cd /d "%~dp0"
 python main.py
 if errorlevel 1 (

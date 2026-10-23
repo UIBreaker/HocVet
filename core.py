@@ -1,5 +1,5 @@
 """
-Smart Operation - Core Engine (v0.10.2)
+Học Vẹt - Core Engine
 Tác giả: Nhật Nam (GitHub: @UIBreaker)
 Chịu trách nhiệm:
 - Ghi và phát lại chuột/bàn phím (DPI Awareness, Emergency Stop).
@@ -16,10 +16,18 @@ import time
 import threading
 import uuid
 import winsound
+import math
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Any, Optional, Callable
 
 from pynput import mouse, keyboard
+from app_info import APP_VERSION
+from conditions import condition_check, decode_reference
+from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity
 
 
 # ==========================================
@@ -66,10 +74,10 @@ def key_to_str(key: Any) -> str:
     """Chuyển đổi đối tượng pynput Key/KeyCode sang chuỗi lưu trữ JSON."""
     if isinstance(key, keyboard.Key):
         return f"Key.{key.name}"
-    elif hasattr(key, "char") and key.char is not None:
-        return key.char
     elif hasattr(key, "vk") and key.vk is not None:
         return f"vk_{key.vk}"
+    elif hasattr(key, "char") and key.char is not None:
+        return key.char
     return str(key)
 
 
@@ -92,34 +100,6 @@ def str_to_button(s: str) -> mouse.Button:
     return getattr(mouse.Button, s, mouse.Button.left)
 
 
-def normalize_hotkey(hk_str: str) -> str:
-    """
-    Chuyển đổi chuỗi tổ hợp phím thân thiện (VD: 'F9', 'Ctrl+F1', 'Alt+1', 'Ctrl+Shift+K', 'ESC')
-    sang định dạng chuẩn của pynput.keyboard.GlobalHotKeys (VD: '<f9>', '<ctrl>+<f1>', '<alt>+1', '<esc>').
-    """
-    if not hk_str:
-        return ""
-    hk = hk_str.lower().strip()
-    parts = [p.strip() for p in hk.split("+") if p.strip()]
-    pynput_parts = []
-    for p in parts:
-        if p in ("ctrl", "control"):
-            pynput_parts.append("<ctrl>")
-        elif p in ("alt",):
-            pynput_parts.append("<alt>")
-        elif p in ("shift",):
-            pynput_parts.append("<shift>")
-        elif p.startswith("f") and p[1:].isdigit():
-            pynput_parts.append(f"<{p}>")
-        elif p in ("esc", "escape"):
-            pynput_parts.append("<esc>")
-        elif p in ("enter", "tab", "space", "home", "end", "page_up", "page_down"):
-            pynput_parts.append(f"<{p}>")
-        else:
-            pynput_parts.append(p)
-    return "+".join(pynput_parts)
-
-
 # ==========================================
 # 4. DATA MODEL CHO MỖI THAO TÁC & KỊCH BẢN
 # ==========================================
@@ -134,6 +114,10 @@ class MacroAction:
     dx: Optional[int] = None
     dy: Optional[int] = None
     key: Optional[str] = None        # Tên phím (Key.enter, 'a', ...)
+    window_title: Optional[str] = None
+    image: Optional[str] = None      # PNG base64 nằm trong kịch bản để chia sẻ cùng file.
+    timeout: float = 30.0
+    tolerance: float = 0.02
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -150,6 +134,10 @@ class MacroAction:
             dx=data.get("dx"),
             dy=data.get("dy"),
             key=data.get("key"),
+            window_title=data.get('window_title'),
+            image=data.get('image'),
+            timeout=float(data.get('timeout', 30)),
+            tolerance=float(data.get('tolerance', 0.02)),
         )
 
 
@@ -214,6 +202,9 @@ class MacroRecorder:
         # Phím điều khiển mặc định
         self.hotkey_record_key = keyboard.Key.f8
         self.hotkey_stop_key = keyboard.Key.esc
+        self.control_hotkeys = ['F8', 'ESC']
+        self._pressed_keys = set()
+        self._ignored_releases = set()
 
         # Callback khi có action mới
         self.on_action_recorded: Optional[Callable[[MacroAction, int], None]] = None
@@ -281,9 +272,19 @@ class MacroRecorder:
         self._add_action(action)
 
     def _on_key_press(self, key: Any):
-        if not self.is_recording:
+        if not self.is_recording or key is None:
             return
-        if key in (self.hotkey_record_key, self.hotkey_stop_key):
+        identity = key_identity(key)
+        self._pressed_keys.add(identity)
+        combinations = [{key_identity(item) for item in parse_hotkey(text)} for text in self.control_hotkeys if text]
+        matched = next((combo for combo in combinations if combo <= self._pressed_keys), None)
+        if matched:
+            self._ignored_releases.update(matched)
+            # Không lưu Ctrl/Alt/Shift vừa bấm để dừng ghi vào cuối kịch bản.
+            with self._lock:
+                while self.actions and self.actions[-1].action_type == 'key_press' and \
+                        key_identity(str_to_key(self.actions[-1].key)) in matched & {'ctrl', 'alt', 'shift', 'cmd'}:
+                    self.actions.pop()
             return
         delay = self._get_delay()
         action = MacroAction(
@@ -294,9 +295,12 @@ class MacroRecorder:
         self._add_action(action)
 
     def _on_key_release(self, key: Any):
-        if not self.is_recording:
+        if not self.is_recording or key is None:
             return
-        if key in (self.hotkey_record_key, self.hotkey_stop_key):
+        identity = key_identity(key)
+        self._pressed_keys.discard(identity)
+        if identity in self._ignored_releases:
+            self._ignored_releases.discard(identity)
             return
         delay = self._get_delay()
         action = MacroAction(
@@ -306,9 +310,16 @@ class MacroRecorder:
         )
         self._add_action(action)
 
+    @staticmethod
+    def _filter_keyboard_event(msg, data):
+        # Bộ gõ tự sinh Backspace/Unicode để thay dấu; chỉ ghi phím vật lý.
+        return not (data.flags & 0x12)  # LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED
+
     def start(self):
         with self._lock:
             self.actions = []
+            self._pressed_keys.clear()
+            self._ignored_releases.clear()
             self.is_recording = True
             self._last_time = time.perf_counter()
 
@@ -322,6 +333,7 @@ class MacroRecorder:
         self._keyboard_listener = keyboard.Listener(
             on_press=self._on_key_press,
             on_release=self._on_key_release,
+            win32_event_filter=self._filter_keyboard_event,
         )
         self._mouse_listener.daemon = True
         self._keyboard_listener.daemon = True
@@ -364,6 +376,8 @@ class MacroPlayer:
         # Callbacks
         self.on_step: Optional[Callable[[int, int, int, int], None]] = None
         self.on_finished: Optional[Callable[[bool, bool], None]] = None
+        self.on_wait: Optional[Callable[[str], None]] = None
+        self.last_error = ''
 
     def is_running(self) -> bool:
         return self.is_playing
@@ -404,6 +418,7 @@ class MacroPlayer:
         if self.is_playing:
             return
         self._abort_event.clear()
+        self.last_error = ''
         self.is_playing = True
         self._play_thread = threading.Thread(
             target=self._run_playback,
@@ -439,10 +454,12 @@ class MacroPlayer:
                             aborted = True
                             break
 
-                    self._execute_action(action)
-
                     if self.on_step:
                         self.on_step(idx, total_steps, current_loop, loop_count)
+                    self._execute_action(action)
+                    if self._abort_event.is_set():
+                        aborted = True
+                        break
 
                 if aborted:
                     break
@@ -457,6 +474,7 @@ class MacroPlayer:
                         break
 
         except Exception as ex:
+            self.last_error = str(ex)
             print(f"Lỗi khi thực hiện thao tác: {ex}", file=sys.stderr)
             aborted = True
         finally:
@@ -470,7 +488,24 @@ class MacroPlayer:
     def _execute_action(self, action: MacroAction):
         act_type = action.action_type
 
-        if act_type == "mouse_click":
+        if act_type in ('wait_window', 'wait_image'):
+            if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
+                raise ValueError('Thời gian chờ phải từ 0 đến 3600 giây.')
+            check = condition_check(action)
+            label = action.window_title if act_type == 'wait_window' else f'ảnh tại ({action.x}, {action.y})'
+            if self.on_wait:
+                self.on_wait(f'ĐANG CHỜ: {label} (tối đa {action.timeout:g}s)')
+            deadline = time.monotonic() + action.timeout
+            while not self._abort_event.is_set():
+                if check():
+                    return
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(f'Hết {action.timeout:g}s chờ {label}. Kịch bản đã dừng trước bước tiếp theo.')
+                if self._abort_event.wait(min(0.2, remaining)):
+                    return
+
+        elif act_type == "mouse_click":
             if action.x is not None and action.y is not None:
                 self.mouse_controller.position = (action.x, action.y)
             btn = str_to_button(action.button or "left")
@@ -507,6 +542,116 @@ class MacroPlayer:
 # 7. SCRIPT LIBRARY & STORAGE
 # ==========================================
 class MacroStorage:
+    MAX_SCRIPT_BYTES = 30 * 1024 * 1024
+
+    @staticmethod
+    def default_library_path():
+        folder = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local')) / 'HocVet'
+        folder.mkdir(parents=True, exist_ok=True)
+        target = folder / 'scripts_library.json'
+        if not target.exists() and not target.with_suffix('.json.bak').exists():
+            app_folder = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+            candidates = [app_folder / 'scripts_library.json', Path.cwd() / 'scripts_library.json']
+            if app_folder.name.lower() == 'dist':
+                candidates.append(app_folder.parent / 'scripts_library.json')
+            for legacy in dict.fromkeys(candidates):
+                if legacy.is_file() and legacy.resolve() != target.resolve():
+                    profiles, settings = MacroStorage.load_library(str(legacy))
+                    MacroStorage.save_library(profiles, target, settings)
+                    break
+        return str(target)
+
+    @staticmethod
+    def _atomic_json(payload, file_path):
+        target = Path(file_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=target.parent,
+                                             prefix=target.name, suffix='.tmp', delete=False) as stream:
+                temporary = stream.name
+                json.dump(payload, stream, ensure_ascii=False, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if target.exists():
+                try:
+                    json.loads(target.read_text(encoding='utf-8'))
+                except (ValueError, UnicodeError):
+                    pass  # Giữ bản dự phòng tốt nếu file chính hỏng.
+                else:
+                    shutil.copy2(target, str(target) + '.bak')
+            os.replace(temporary, target)
+        finally:
+            if temporary and os.path.exists(temporary):
+                os.unlink(temporary)
+
+    @staticmethod
+    def validate_profile(profile):
+        allowed = {'mouse_click', 'mouse_move', 'mouse_scroll', 'key_press', 'key_release',
+                   'wait_window', 'wait_image'}
+        if not profile.name or len(profile.actions) > 100000:
+            raise ValueError('Tên kịch bản trống hoặc quá nhiều bước.')
+        if profile.hotkey:
+            keyboard.HotKey.parse(normalize_hotkey(profile.hotkey))
+        for value in (profile.speed, profile.loop_delay):
+            if not math.isfinite(value) or value < 0:
+                raise ValueError('Tốc độ hoặc thời gian nghỉ không hợp lệ.')
+        if profile.speed < 0.1 or profile.loop_count < 0:
+            raise ValueError('Tốc độ tối thiểu 0.1; số vòng không được âm.')
+        for action in profile.actions:
+            if action.action_type not in allowed or not math.isfinite(action.delay) or action.delay < 0:
+                raise ValueError('Loại thao tác hoặc độ trễ không hợp lệ.')
+            if action.action_type.startswith('key_'):
+                if not isinstance(action.key, str) or not action.key or str_to_key(action.key) is None:
+                    raise ValueError('Phím trong kịch bản không hợp lệ.')
+            if action.action_type.startswith('mouse_'):
+                if not all(isinstance(value, int) for value in (action.x, action.y)):
+                    raise ValueError('Tọa độ chuột không hợp lệ.')
+                if action.action_type == 'mouse_click' and (action.button not in ('left', 'right', 'middle') or not isinstance(action.pressed, bool)):
+                    raise ValueError('Nút chuột không hợp lệ.')
+                if action.action_type == 'mouse_scroll' and not all(isinstance(value, int) for value in (action.dx, action.dy)):
+                    raise ValueError('Khoảng cuộn chuột không hợp lệ.')
+            if action.action_type.startswith('wait_'):
+                if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
+                    raise ValueError('Thời hạn chờ phải lớn hơn 0 và tối đa 3600 giây.')
+            if action.action_type == 'wait_window' and not (action.window_title or '').strip():
+                raise ValueError('Thiếu tên cửa sổ cần chờ.')
+            if action.action_type == 'wait_image':
+                if not isinstance(action.x, int) or not isinstance(action.y, int):
+                    raise ValueError('Thiếu tọa độ vùng ảnh cần chờ.')
+                if not math.isfinite(action.tolerance) or not 0 <= action.tolerance <= 0.2:
+                    raise ValueError('Sai số ảnh phải từ 0 đến 20%.')
+                decode_reference(action.image)
+
+    @staticmethod
+    def export_profile(profile, file_path):
+        MacroStorage.validate_profile(profile)
+        text = MacroStorage.export_profile_to_string(profile).encode('utf-8')
+        if len(text) > MacroStorage.MAX_SCRIPT_BYTES:
+            raise ValueError('Kịch bản quá lớn (tối đa 30 MB).')
+        if str(file_path).lower().endswith('.json'):
+            MacroStorage._atomic_json(json.loads(text), file_path)
+            return
+        with zipfile.ZipFile(file_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('script.json', text)
+
+    @staticmethod
+    def import_profile(file_path):
+        if zipfile.is_zipfile(file_path):
+            with zipfile.ZipFile(file_path) as archive:
+                info = archive.getinfo('script.json')
+                if info.file_size > MacroStorage.MAX_SCRIPT_BYTES:
+                    raise ValueError('Kịch bản quá lớn (tối đa 30 MB).')
+                text = archive.read(info).decode('utf-8')
+        else:
+            if os.path.getsize(file_path) > MacroStorage.MAX_SCRIPT_BYTES:
+                raise ValueError('Kịch bản quá lớn (tối đa 30 MB).')
+            text = Path(file_path).read_text(encoding='utf-8-sig')
+        profile = MacroStorage.import_profile_from_string(text)
+        if profile is None:
+            raise ValueError('File không phải kịch bản Học Vẹt hợp lệ.')
+        return profile
+
     @staticmethod
     def save_to_file(actions: List[MacroAction], file_path: str, metadata: Optional[Dict[str, Any]] = None):
         payload = {
@@ -516,8 +661,7 @@ class MacroStorage:
             "total_actions": len(actions),
             "actions": [act.to_dict() for act in actions],
         }
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
+        MacroStorage._atomic_json(payload, file_path)
 
     @staticmethod
     def load_from_file(file_path: str) -> List[MacroAction]:
@@ -534,33 +678,41 @@ class MacroStorage:
     def save_library(profiles: List[ScriptProfile], file_path: str, settings: Optional[Dict[str, Any]] = None):
         """Lưu toàn bộ thư viện nhiều kịch bản ra file JSON."""
         payload = {
-            "version": "0.10.2",
+            "version": APP_VERSION,
             "author": "Nhật Nam (@UIBreaker)",
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "settings": settings or {},
             "profiles": [p.to_dict() for p in profiles],
         }
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
+        MacroStorage._atomic_json(payload, file_path)
 
     @staticmethod
     def load_library(file_path: str) -> tuple[List[ScriptProfile], Dict[str, Any]]:
         """Nạp thư viện nhiều kịch bản từ file JSON."""
-        if not os.path.isfile(file_path):
+        file_path = str(file_path)
+        if not os.path.isfile(file_path) and not os.path.isfile(file_path + '.bak'):
             return [], {}
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        raw_profiles = data.get("profiles", [])
-        profiles = [ScriptProfile.from_dict(item) for item in raw_profiles]
-        settings = data.get("settings", {})
-        return profiles, settings
+        def read(path):
+            with open(path, 'r', encoding='utf-8') as stream:
+                data = json.load(stream)
+            if not isinstance(data, dict) or not isinstance(data.get('profiles'), list):
+                raise ValueError('Thư viện kịch bản sai định dạng.')
+            profiles = [ScriptProfile.from_dict(item) for item in data['profiles']]
+            settings = data.get('settings', {})
+            if not isinstance(settings, dict):
+                raise ValueError('Cài đặt sai định dạng.')
+            return profiles, settings
+        try:
+            return read(file_path)
+        except (OSError, ValueError, TypeError, AttributeError):
+            return read(file_path + '.bak')
 
     @staticmethod
     def export_profile_to_string(profile: ScriptProfile) -> str:
         """Đóng gói kịch bản thành chuỗi JSON gọn gàng để sao chép qua máy khác."""
         payload = {
             "smart_operation_macro": True,
-            "version": "0.10.2",
+            "version": APP_VERSION,
             "author": "Nhật Nam (@UIBreaker)",
             "profile": profile.to_dict(),
         }
@@ -574,10 +726,16 @@ class MacroStorage:
             if isinstance(data, dict):
                 if "profile" in data:
                     p = ScriptProfile.from_dict(data["profile"])
+                    MacroStorage.validate_profile(p)
                     p.id = str(uuid.uuid4())[:8]  # Đổi ID mới tránh trùng lặp
                     return p
                 elif "actions" in data:
                     p = ScriptProfile.from_dict(data)
+                    metadata = data.get('metadata', {})
+                    p.name = metadata.get('name', p.name)
+                    p.hotkey = metadata.get('hotkey', p.hotkey)
+                    p.speed = float(metadata.get('speed', p.speed))
+                    MacroStorage.validate_profile(p)
                     p.id = str(uuid.uuid4())[:8]
                     return p
         except Exception:
@@ -593,18 +751,24 @@ class MacroManager:
     STATE_RECORDING = "recording"
     STATE_PLAYING = "playing"
 
-    def __init__(self, library_path: str = "scripts_library.json"):
+    def __init__(self, library_path: Optional[str] = None):
         self.state = self.STATE_IDLE
         self.recorder = MacroRecorder(record_movement=False)
         self.player = MacroPlayer()
 
-        self.library_path = library_path
+        self.library_path = library_path if library_path is not None else MacroStorage.default_library_path()
         self.profiles: List[ScriptProfile] = []
         self.active_profile_id: Optional[str] = None
 
         # Cài đặt phím tắt hệ thống
         self.hotkey_record_str = "F8"
         self.hotkey_panic_str = "ESC"
+        self.button_hotkeys = {name: default for name, (_, default, _) in SHORTCUT_ACTIONS.items()
+                               if name not in ('record', 'panic')}
+        self.on_command = None
+        self.shortcuts_suspended = False
+        self.button_hotkey_scopes = {name: 'global' if name == 'show' else 'app'
+                                     for name in self.button_hotkeys if SHORTCUT_ACTIONS[name][2] != 'dialog'}
 
         # Cài đặt ứng dụng
         self.minimize_to_tray_on_close = True
@@ -682,6 +846,14 @@ class MacroManager:
             self.active_profile_id = sample_profile.id
 
         if settings:
+            saved = settings.get('button_hotkeys', {})
+            if isinstance(saved, dict):
+                self.button_hotkeys.update({name: value for name, value in saved.items()
+                    if name in self.button_hotkeys and isinstance(value, str)})
+            scopes = settings.get('button_hotkey_scopes', {})
+            if isinstance(scopes, dict):
+                self.button_hotkey_scopes.update({name: value for name, value in scopes.items()
+                    if name in self.button_hotkey_scopes and value in ('app', 'global')})
             self.hotkey_record_str = settings.get("hotkey_record", "F8")
             self.hotkey_panic_str = settings.get("hotkey_panic", "ESC")
             self.minimize_to_tray_on_close = settings.get("minimize_to_tray_on_close", True)
@@ -691,6 +863,8 @@ class MacroManager:
             "hotkey_record": self.hotkey_record_str,
             "hotkey_panic": self.hotkey_panic_str,
             "minimize_to_tray_on_close": self.minimize_to_tray_on_close,
+            "button_hotkeys": self.button_hotkeys,
+            "button_hotkey_scopes": self.button_hotkey_scopes,
         }
         MacroStorage.save_library(self.profiles, self.library_path, settings=settings)
 
@@ -706,6 +880,8 @@ class MacroManager:
     def start_global_hotkeys(self):
         """Khởi động bộ lắng nghe phím tắt toàn hệ thống cho tất cả kịch bản."""
         self.stop_global_hotkeys()
+        if self.shortcuts_suspended:
+            return
 
         hotkey_map = {}
 
@@ -728,8 +904,13 @@ class MacroManager:
                 # Đóng gói profile vào callback
                 hotkey_map[norm_hk] = (lambda p=profile: self._on_hotkey_play_profile(p))
 
+        for action, hotkey in self.button_hotkeys.items():
+            if hotkey and self.button_hotkey_scopes.get(action) == 'global':
+                hotkey_map.setdefault(normalize_hotkey(hotkey), lambda name=action: self._on_command_hotkey(name))
+
         try:
-            self._global_hotkeys = keyboard.GlobalHotKeys(hotkey_map)
+            self._global_hotkeys = keyboard.GlobalHotKeys(hotkey_map,
+                win32_event_filter=MacroRecorder._filter_keyboard_event)
             self._global_hotkeys.daemon = True
             self._global_hotkeys.start()
         except Exception as ex:
@@ -746,6 +927,22 @@ class MacroManager:
     def reload_global_hotkeys(self):
         """Cập nhật lại phím tắt khi người dùng thêm/sửa kịch bản hoặc đổi cài đặt."""
         self.start_global_hotkeys()
+
+    def shortcut_values(self):
+        return dict(self.button_hotkeys, record=self.hotkey_record_str, panic=self.hotkey_panic_str)
+
+    def apply_shortcuts(self, values, scopes=None):
+        scopes = self.button_hotkey_scopes if scopes is None else scopes
+        validate_shortcuts(values, self.profiles, scopes)
+        self.hotkey_record_str = values['record'].strip().upper()
+        self.hotkey_panic_str = values['panic'].strip().upper()
+        self.button_hotkeys = {name: values.get(name, '').strip() for name in self.button_hotkeys}
+        self.button_hotkey_scopes = {name: scopes.get(name, 'app') for name in self.button_hotkey_scopes}
+
+    def _on_command_hotkey(self, action):
+        if self.on_command and (self.state == self.STATE_IDLE or
+                action == 'stop_record' and self.state == self.STATE_RECORDING):
+            self.on_command(action)
 
     def _on_hotkey_toggle_record(self):
         if self.state == self.STATE_IDLE:
@@ -767,6 +964,8 @@ class MacroManager:
         if self.state != self.STATE_IDLE:
             return
         self.recorder.record_movement = record_movement
+        self.recorder.control_hotkeys = [self.hotkey_record_str, self.hotkey_panic_str,
+                                         self.button_hotkeys.get('stop_record', '')]
         self.recorder.start()
         self._set_state(self.STATE_RECORDING)
 

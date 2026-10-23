@@ -1,5 +1,5 @@
 """
-Smart Operation - Điểm khởi chạy chính của ứng dụng
+Học Vẹt - Điểm khởi chạy chính của ứng dụng
 """
 from ui import run_app
 

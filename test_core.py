@@ -1,5 +1,5 @@
 """
-Unit Test tự động kiểm tra logic cốt lõi của Smart Operation (core.py).
+Unit Test tự động kiểm tra logic cốt lõi của Học Vẹt (core.py).
 Chạy độc lập: python test_core.py
 Không cần cài đặt thêm framework nào ngoài thư viện chuẩn.
 """
@@ -8,6 +8,8 @@ import os
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 if sys.platform == "win32":
     try:
@@ -38,7 +40,57 @@ def test_key_serialization():
             assert restored == key, f"Phím không khớp: {key} != {restored}"
         elif hasattr(key, 'char') and key.char:
             assert getattr(restored, 'char', None) == key.char
+    physical = keyboard.KeyCode.from_vk(65, char='A')
+    assert key_to_str(physical) == 'vk_65'
+    assert str_to_key(key_to_str(physical)).vk == 65
+    assert str_to_key('á').char == 'á'  # Kịch bản cũ vẫn đọc được.
     print("   [PASS] Chuyển đổi phím chính xác.")
+
+
+def test_vietnamese_recording_playback():
+    from core import MacroRecorder, MacroPlayer
+
+    recorder = MacroRecorder()
+    with patch('core.keyboard.Listener') as listener, \
+            patch('core.mouse.Listener'), patch('core.play_sound'):
+        recorder.start()
+        callbacks = listener.call_args.kwargs
+
+        def emit(key, flags=0, pressed=True):
+            msg = 0x100 if pressed else 0x101
+            if callbacks['win32_event_filter'](msg, SimpleNamespace(flags=flags)):
+                callbacks['on_press' if pressed else 'on_release'](key)
+
+        # Chuỗi Telex cho “khám sức khoẻ”; bộ gõ xen phím thay dấu.
+        text_keys = 'khams suwc khoer'
+        for char in text_keys:
+            vk = 32 if char == ' ' else ord(char.upper())
+            emit(keyboard.KeyCode.from_vk(vk, char=char))
+            emit(keyboard.Key.backspace, flags=0x10)
+            emit(keyboard.KeyCode.from_char('á'), flags=0x10)
+            emit(keyboard.KeyCode.from_char('á'), flags=0x12, pressed=False)
+            # Bản dịch ký tự ở lần nhả có thể khác lần nhấn, VK vẫn giống nhau.
+            emit(keyboard.KeyCode.from_vk(vk, char=char.upper()), pressed=False)
+        emit(keyboard.Key.f8)
+        emit(keyboard.Key.esc)
+        emit(None)
+        actions = recorder.stop()
+
+    assert len(actions) == len(text_keys) * 2
+    with patch('core.mouse.Controller'), patch('core.keyboard.Controller'):
+        player = MacroPlayer()
+        for i, char in enumerate(text_keys):
+            vk = 32 if char == ' ' else ord(char.upper())
+            down, up = actions[2*i:2*i+2]
+            assert down.key == up.key == f'vk_{vk}'
+            for action in (down, up):
+                player._execute_action(MacroAction.from_dict(action.to_dict()))
+        assert player.keyboard_controller.press.call_count == len(text_keys)
+        assert player.keyboard_controller.release.call_count == len(text_keys)
+        expected = [32 if c == ' ' else ord(c.upper()) for c in text_keys]
+        assert [c.args[0].vk for c in player.keyboard_controller.press.call_args_list] == expected
+        assert [c.args[0].vk for c in player.keyboard_controller.release.call_args_list] == expected
+    print('   [PASS] Tiếng Việt: bỏ phím do bộ gõ sinh, phát đúng phím vật lý một lần.')
 
 
 def test_button_serialization():
@@ -167,6 +219,8 @@ def test_macro_manager_state_machine():
     print("-> Kiểm tra máy trạng thái MacroManager (State Machine)...")
     from core import MacroManager
     mgr = MacroManager(library_path="test_temp_library.json")
+    mgr.player.keyboard_controller = Mock()
+    mgr.player.mouse_controller = Mock()
     assert mgr.state == MacroManager.STATE_IDLE
 
     # Mock action list on active profile
@@ -247,8 +301,12 @@ def test_delete_profile():
 
 
 if __name__ == "__main__":
+    # Một số sandbox Windows không cho os.replace ở thư mục Temp hệ thống.
+    tempfile.tempdir = os.path.abspath(os.path.join('build', 'test-temp'))
+    os.makedirs(tempfile.tempdir, exist_ok=True)
     print("================ BẮT ĐẦU KIỂM THỬ CORE ENGINE ================")
     test_key_serialization()
+    test_vietnamese_recording_playback()
     test_button_serialization()
     test_macro_action_roundtrip()
     test_storage_json_roundtrip()
