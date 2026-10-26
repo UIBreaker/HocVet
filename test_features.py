@@ -258,6 +258,57 @@ class FeaturesTest(unittest.TestCase):
             actions = recorder.stop()
         self.assertEqual([(a.action_type, a.key) for a in actions], [('key_press', 'vk_82'), ('key_release', 'vk_82')])
 
+    def test_stop_digit_is_global_after_loading_old_app_scope(self):
+        path = str(self.folder / 'old-settings.json')
+        MacroStorage.save_library([self.profile()], path,
+            {'button_hotkeys': {'stop_record': '2'}, 'button_hotkey_scopes': {'stop_record': 'app'}})
+        manager = MacroManager(path)
+        self.assertEqual(manager.button_hotkey_scopes['stop_record'], 'global')
+        with patch('core.keyboard.GlobalHotKeys') as listener:
+            manager.start_global_hotkeys()
+            self.assertIn('2', listener.call_args.args[0])
+
+    def test_new_profile_play_hotkey_works_after_learning_without_hook_restart(self):
+        manager = MacroManager(str(self.folder / 'library.json'))
+        profile = ScriptProfile(name='Mới tạo', hotkey='F9', actions=[])
+        manager.profiles = [profile]
+        with patch('core.keyboard.GlobalHotKeys') as listener, patch.object(manager, 'start_playing_profile') as play:
+            manager.start_global_hotkeys()
+            activate = listener.call_args.args[0]['<f9>']
+            activate()
+            play.assert_not_called()
+            profile.actions = [MacroAction('key_press', 0, key='a')]
+            activate()
+            play.assert_called_once_with(profile)
+
+    def test_ignore_own_mouse_events_and_cache_hotkey_parsing(self):
+        from core import MacroRecorder
+        from pynput import keyboard, mouse
+        recorder = MacroRecorder(record_movement=True)
+        recorder.ignore_mouse = Mock(return_value=True)
+        with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'):
+            recorder.start()
+            recorder._on_mouse_click(20, 30, mouse.Button.left, True)
+            recorder._on_mouse_scroll(20, 30, 0, 1)
+            recorder._on_mouse_move(20, 30)
+            with patch('core.hotkey_identities', side_effect=AssertionError('reparsed in hot path')):
+                recorder._on_key_press(keyboard.KeyCode.from_vk(65, char='a'))
+                recorder._on_key_release(keyboard.KeyCode.from_vk(65, char='a'))
+            self.assertEqual([a.action_type for a in recorder.stop()], ['key_press', 'key_release'])
+
+    def test_own_window_filter_uses_process_identity(self):
+        from ui import HocVetApp
+        def own_process(handle, pointer):
+            pointer._obj.value = os.getpid()
+        with patch('ui.ctypes.windll.user32.WindowFromPoint', return_value=123), \
+                patch('ui.ctypes.windll.user32.GetWindowThreadProcessId', side_effect=own_process):
+            self.assertTrue(HocVetApp._is_own_window(10, 20))
+        def other_process(handle, pointer):
+            pointer._obj.value = os.getpid()+1
+        with patch('ui.ctypes.windll.user32.WindowFromPoint', return_value=456), \
+                patch('ui.ctypes.windll.user32.GetWindowThreadProcessId', side_effect=other_process):
+            self.assertFalse(HocVetApp._is_own_window(10, 20))
+
 
 class UITest(unittest.TestCase):
     def setUp(self):
@@ -379,11 +430,16 @@ class UITest(unittest.TestCase):
         self.assertEqual(entry.get(), 'Ctrl+J')
         entries['help'].delete(0, 'end')
         entries['help'].insert(0, 'F6')
+        entries['stop_record'].delete(0, 'end')
+        entries['stop_record'].insert(0, '2')
         button(dialog, 'Lưu cài đặt').invoke()
         self.root.update()
         self.assertFalse(self.app.manager.shortcuts_suspended)
         restored = MacroManager(self.app.manager.library_path)
         self.assertEqual(restored.button_hotkeys['help'], 'F6')
+        self.assertEqual(restored.button_hotkeys['stop_record'], '2')
+        self.assertEqual(restored.button_hotkey_scopes['stop_record'], 'global')
+        self.assertIn('2', self.app.btn_stop.text)
         with patch.object(self.app, '_dispatch_shortcut') as dispatch:
             self.root.deiconify()
             self.root.update()
@@ -410,6 +466,133 @@ class UITest(unittest.TestCase):
             save.invoke()
         self.assertEqual(self.app.manager.button_hotkeys['help'], 'F1')
         dialog.destroy()
+
+    def test_background_f8_countdown_digit_stop_and_saved_notice(self):
+        from pynput import keyboard
+        app = self.app
+        app.manager.button_hotkeys['stop_record'] = '2'
+        original = list(self.profile.actions)
+        with patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_windows'), \
+                patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'):
+            self.root.withdraw()
+            app.manager._on_hotkey_toggle_record()
+            app._process_ui_events()
+            self.assertEqual(app.manager.state, MacroManager.STATE_COUNTDOWN)
+            self.assertFalse(app.manager.recorder.is_recording)
+            self.assertEqual(self.profile.actions, original)
+            self.assertEqual(notice.call_args.kwargs['number'], 3)
+            for second in (2, 1, 0):
+                self.root.after_cancel(app.countdown_timer)
+                app._start_countdown(second)
+            self.assertTrue(app.manager.recorder.is_recording)
+            recorder = app.manager.recorder
+            recorder._on_key_press(keyboard.KeyCode.from_vk(65, char='a'))
+            recorder._on_key_release(keyboard.KeyCode.from_vk(65, char='a'))
+            # Phím 2 thật được pynput canonical hóa, không chỉ gọi thẳng callback giả.
+            stop_key = keyboard.KeyCode.from_vk(50, char='2')
+            recorder._on_key_press(stop_key)
+            recorder._on_key_release(stop_key)
+            listener = keyboard.GlobalHotKeys({'2': lambda: app.manager._on_command_hotkey('stop_record')})
+            listener._on_press(stop_key, False)
+            listener._on_release(stop_key, False)
+            app._process_ui_events()
+            self.assertEqual(app.manager.state, MacroManager.STATE_IDLE)
+            self.assertEqual([a.key for a in self.profile.actions], ['vk_65', 'vk_65'])
+            self.assertIn('LƯU THÀNH CÔNG', notice.call_args.args[0])
+            saved = MacroStorage.load_library(app.manager.library_path)[0][0]
+            self.assertEqual([a.key for a in saved.actions], ['vk_65', 'vk_65'])
+
+    def test_cancel_countdown_by_f8_and_panic_preserves_script(self):
+        app = self.app
+        original = list(self.profile.actions)
+        with patch.object(app.record_notice, 'show'), patch.object(app.manager.recorder, 'start') as start:
+            app.manager._on_hotkey_toggle_record()
+            app._process_ui_events()
+            app.manager._on_hotkey_toggle_record()
+            app._process_ui_events()
+            self.assertEqual(app.manager.state, MacroManager.STATE_IDLE)
+            self.assertIsNone(app.countdown_timer)
+            app.manager._on_hotkey_toggle_record()
+            app._process_ui_events()
+            app.manager._on_hotkey_panic()
+            app._process_ui_events()
+            self.assertEqual(app.manager.state, MacroManager.STATE_IDLE)
+            self.assertEqual(self.profile.actions, original)
+            start.assert_not_called()
+
+    def test_numpad_stop_not_stored(self):
+        from pynput import keyboard
+        recorder = self.app.manager.recorder
+        recorder.control_hotkeys = ['2']
+        with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'):
+            recorder.start()
+            recorder._on_key_press(keyboard.KeyCode.from_vk(98, char='2'))
+            recorder._on_key_release(keyboard.KeyCode.from_vk(98, char='2'))
+            self.assertEqual(recorder.stop(), [])
+
+    def test_ui_stop_click_is_not_recorded(self):
+        from pynput import mouse
+        app = self.app
+        self.root.deiconify()
+        self.root.lift()
+        self.root.update()
+        with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'), \
+                patch.object(app.record_notice, 'show'), patch.object(app, 'notify_windows'):
+            app.manager.start_recording()
+            app._process_ui_events()
+            self.root.focus_force()
+            self.root.update()
+            x = app.btn_stop.winfo_rootx() + 12
+            y = app.btn_stop.winfo_rooty() + 12
+            # Không phụ thuộc cửa sổ khác đang che desktop của máy chạy kiểm thử.
+            app.manager.recorder.ignore_mouse = Mock(return_value=True)
+            app.manager.recorder.ignore_keyboard = Mock(return_value=True)
+            app.manager.recorder._on_mouse_click(x, y, mouse.Button.left, True)
+            app.manager.recorder.ignore_mouse.assert_called_once_with(x, y)
+            from pynput import keyboard
+            app.manager.recorder._on_key_press(keyboard.Key.space)
+            app.btn_stop._activate()
+            self.assertEqual(self.profile.actions, [])
+
+    def test_recording_events_do_not_schedule_or_redraw_per_action(self):
+        app = self.app
+        action = MacroAction('key_press', 0, key='a')
+        with patch.object(self.root, 'after') as schedule, patch.object(app.tree, 'insert') as insert:
+            for count in range(10000):
+                app._on_action_recorded(action, count)
+                app._on_player_step(count, 10000, 1, 1)
+            schedule.assert_not_called()
+            insert.assert_not_called()
+            self.assertEqual(app._recorded_count, 9999)
+            self.assertEqual(app._pending_progress[0], 9999)
+
+    def test_large_preview_keeps_correct_original_action_index(self):
+        self.profile.actions = [MacroAction('key_press', 0, key='a') for _ in range(2000)]
+        self.app._refresh_action_tree()
+        self.assertEqual(len(self.app.tree.get_children()), 1000)
+        self.assertEqual(self.app.tree.get_children()[0], '0')
+        self.app._change_preview(1)
+        self.assertEqual(self.app.tree.get_children()[0], '1000')
+        self.app.tree.selection_set('1500')
+        with patch('ui.simpledialog.askfloat', return_value=1.25):
+            self.app._cmd_edit_delay()
+        self.assertEqual(self.profile.actions[1500].delay, 1.25)
+        self.assertEqual(self.profile.actions[500].delay, 0)
+
+    def test_save_failure_does_not_report_success_or_discard_recording(self):
+        from pynput import keyboard
+        app = self.app
+        with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'), \
+                patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_windows'), \
+                patch.object(app.manager, 'save_library', side_effect=OSError('disk unavailable')):
+            app.manager.start_recording()
+            app.manager.recorder._on_key_press(keyboard.KeyCode.from_vk(65, char='a'))
+            app._post(app._cmd_stop_recording)
+            app._process_ui_events()
+            self.assertEqual(app.manager.state, MacroManager.STATE_IDLE)
+            self.assertFalse(app.manager.recorder.is_recording)
+            self.assertEqual(self.profile.actions[0].key, 'vk_65')
+            self.assertFalse(any('THÀNH CÔNG' in call.args[0] for call in notice.call_args_list))
 
 
 if __name__ == '__main__':

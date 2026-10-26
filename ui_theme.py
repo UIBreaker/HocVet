@@ -6,10 +6,10 @@ from tkinter import ttk
 # ==========================================
 # RETRO HARDWARE COLOR PALETTE (Braun / Dieter Rams)
 # ==========================================
-VINTAGE_BG = "#ece7de"             # Nền kem cổ điển tổng thể
-VINTAGE_CARD_BG = "#f6f3ec"        # Nền thẻ bề mặt mờ nhạt
-VINTAGE_CARD_BORDER = "#ded7cb"    # Viền thẻ nổi nhẹ
-VINTAGE_INNER_GROOVE = "#e4ded4"   # Rãnh thụt / khe trượt
+VINTAGE_BG = "#e7dfce"             # Nền kem cổ điển tổng thể
+VINTAGE_CARD_BG = "#f5f1e5"        # Nền thẻ bề mặt mờ nhạt
+VINTAGE_CARD_BORDER = "#c9c1b1"    # Viền thẻ nổi nhẹ
+VINTAGE_INNER_GROOVE = "#ded8c9"   # Rãnh thụt / khe trượt
 VINTAGE_TEXT_HEAD = "#3e3a35"      # Chữ tiêu đề tối màu
 VINTAGE_TEXT_BODY = "#585249"      # Chữ thông tin chung
 VINTAGE_TEXT_MUTED = "#8c8579"     # Chữ phụ / ghi chú
@@ -26,7 +26,7 @@ BTN_BLUE_TOP = "#96c5dc"
 BTN_BLUE_BOT = "#699bb3"
 BTN_BLUE_TXT = "#1c3848"
 
-BTN_RED_TOP = "#d94f4f"
+BTN_RED_TOP = "#d65c4f"
 BTN_RED_BOT = "#a42a2a"
 BTN_RED_TXT = "#ffffff"
 
@@ -73,9 +73,9 @@ def apply_theme(root, scale):
         style.map(name, background=[('disabled', VINTAGE_INNER_GROOVE), ('pressed', bottom), ('active', top)],
                   foreground=[('disabled', VINTAGE_TEXT_MUTED)], relief=[('pressed', 'sunken')])
     style.configure('TSeparator', background=VINTAGE_CARD_BORDER)
-    style.configure('TScrollbar', background=BTN_BEIGE_TOP, troughcolor=VINTAGE_INNER_GROOVE,
+    style.configure('TScrollbar', background=BTN_RED_TOP, troughcolor=VINTAGE_INNER_GROOVE,
                     arrowcolor=VINTAGE_TEXT_HEAD, bordercolor=VINTAGE_CARD_BORDER)
-    style.configure('RetroHardware.Vertical.TScrollbar', background=BTN_BEIGE_TOP,
+    style.configure('RetroHardware.Vertical.TScrollbar', background=BTN_RED_TOP,
                     troughcolor=VINTAGE_INNER_GROOVE, arrowcolor=VINTAGE_TEXT_HEAD)
     style.configure('RetroHardware.Treeview', background='#fffdf8', fieldbackground='#fffdf8',
                     foreground=VINTAGE_TEXT_HEAD, font=FONT_BODY, rowheight=round(28*scale), borderwidth=0)
@@ -101,7 +101,7 @@ def create_dialog(parent, title, subtitle='', size=(640, 420), modal=True):
     tk.Label(header, text=f'{APP_NAME.upper()}  /  {APP_VERSION}', bg=VINTAGE_BG,
              fg=VINTAGE_TEXT_MUTED, font=FONT_TITLE).pack(anchor='w')
     tk.Label(header, text=title, bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
-             font=('Segoe UI', 14, 'bold')).pack(anchor='w', pady=(4, 0))
+             font=('Bahnschrift SemiCondensed', 19)).pack(anchor='w', pady=(4, 0))
     if subtitle:
         label = tk.Label(header, text=subtitle, bg=VINTAGE_BG, fg=VINTAGE_TEXT_BODY,
                          font=FONT_BODY, justify='left', anchor='w', wraplength=width-48)

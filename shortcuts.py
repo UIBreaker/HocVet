@@ -1,5 +1,7 @@
 """Danh sách lệnh và cú pháp phím tắt dùng chung cho cài đặt / bộ lắng nghe."""
 from pynput import keyboard
+import ctypes
+from ctypes import wintypes
 
 
 # id: (nhãn, phím mặc định, phạm vi). Các nút trong hộp thoại dùng phím theo ngữ cảnh.
@@ -7,7 +9,7 @@ SHORTCUT_ACTIONS = {
     'record': ('Bắt đầu / dừng học', 'F8', 'global'),
     'panic': ('Dừng khẩn cấp', 'ESC', 'global'),
     'play': ('Chạy kịch bản đang chọn', '', 'global'),
-    'stop_record': ('Dừng học và lưu', '', 'global'),
+    'stop_record': ('Dừng học và lưu (kể cả chạy nền)', '', 'global'),
     'add_profile': ('Tạo kịch bản mới', '', 'global'),
     'edit_profile': ('Sửa tên / phím của kịch bản đang chọn', '', 'global'),
     'delete_profile': ('Xóa kịch bản đang chọn', '', 'global'),
@@ -21,6 +23,9 @@ SHORTCUT_ACTIONS = {
     'wait_window': ('Thêm chờ cửa sổ', '', 'global'),
     'wait_image': ('Thêm chờ ảnh / nút', '', 'global'),
     'edit_condition': ('Sửa điều kiện đang chọn', '', 'global'),
+    'details': ('Mở / đóng phần chi tiết các bước', '', 'global'),
+    'prev_page': ('Trang bước trước', '', 'global'),
+    'next_page': ('Trang bước sau', '', 'global'),
     **{f'speed_{value}': (f'Tốc độ {value}x', '', 'global')
        for value in ('0.5', '0.8', '1.0', '1.25', '1.5', '2.0')},
     'toggle_movement': ('Bật / tắt bỏ qua di chuột thừa', '', 'global'),
@@ -69,9 +74,24 @@ def key_identity(key):
                 return modifier
         return key.value.vk if key.value.vk is not None else name
     if getattr(key, 'vk', None) is not None:
+        if 96 <= key.vk <= 105:
+            return ord('0') + key.vk - 96
         return key.vk
     char = getattr(key, 'char', '') or ''
-    return ord(char.upper()) if len(char) == 1 and char.isascii() and char.isalnum() else char
+    if len(char) == 1 and char.isascii() and char.isalnum():
+        return ord(char.upper())
+    if len(char) == 1:
+        scan = ctypes.windll.user32.VkKeyScanW
+        scan.argtypes = [wintypes.WCHAR]
+        scan.restype = ctypes.c_short
+        value = scan(char)
+        if value != -1:
+            return value & 0xff
+    return char
+
+
+def hotkey_identities(text):
+    return frozenset(key_identity(key) for key in parse_hotkey(text))
 
 
 def validate_shortcuts(values, profiles, scopes=None):

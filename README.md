@@ -1,12 +1,22 @@
-# Học Vẹt · v0.12.0
+# Học Vẹt · v0.13.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
+## Có gì mới trong 0.13.0
+
+- Giao diện bảng điều khiển mới, ba bước chọn kịch bản, điều chỉnh và học/chạy.
+- Thông báo nổi đếm ngược **3–2–1**, đang học và đã lưu, kể cả khi thu vào khay.
+- Sửa phím **Dừng học** toàn cục, hỗ trợ hàng số và bàn phím số; bỏ qua thao tác trên cửa sổ Học Vẹt khi ghi.
+- Ghi/phát mượt hơn; xem và sửa kịch bản dài theo trang **1.000 bước**, vẫn lưu đủ thao tác.
+- Hủy đếm ngược mà không mất kịch bản cũ; chỉ báo lưu thành công khi đã lưu xong.
+
+Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
+
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.12.0-Windows.zip** tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Bản đóng gói không cần cài Python. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+Tải **HocVet.exe** hoặc **HocVet-v0.13.0-Windows.zip** tại [bản phát hành 0.13.0](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.13.0). Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
 
 Khi nâng cấp từ Smart Operation, đặt ứng dụng cạnh `scripts_library.json` cũ trước lần mở đầu tiên. Nếu chạy từ thư mục `dist`, ứng dụng cũng kiểm tra thư mục cha. File cũ được giữ nguyên. Từ lần sau có thể thay / di chuyển file ứng dụng mà vẫn giữ thư viện.
 
@@ -14,9 +24,9 @@ Khi nâng cấp từ Smart Operation, đặt ứng dụng cạnh `scripts_librar
 
 ## Sử dụng nhanh
 
-1. Tạo hoặc chọn kịch bản, nhấn **F8** để học thao tác. Làm các bước trên phần mềm đích, nhấn lại **F8** để dừng và lưu.
+1. Chọn kịch bản (hoặc **+ Tạo mới**), nhấn **F8**. Thông báo nổi đếm ngược **3–2–1**, sau đó báo **Đang học** ngay cả khi cửa sổ đang thu vào khay. Làm các bước trên phần mềm đích; nhấn lại **F8** hoặc phím **Dừng học** đã gán để dừng/lưu. Thông báo **Đã dừng & lưu thành công** xuất hiện sau khi lưu xong. Bấm Dừng trên Học Vẹt không bị ghi vào kịch bản.
 2. Chọn **Chạy** hoặc dùng phím riêng của kịch bản (mặc định mẫu: **F9**). Nhấn **Esc** để dừng khẩn cấp, kể cả trong khi chờ điều kiện.
-3. Chọn một dòng, dùng **+ Chờ cửa sổ** / **+ Chờ ảnh / nút** để chèn điều kiện trước dòng đó; không chọn dòng sẽ thêm ở cuối. **Sửa điều kiện** để đổi ảnh hoặc thời hạn.
+3. Mở **Chi tiết / sửa bước**, chọn một dòng, dùng **+ Chờ cửa sổ** / **+ Chờ ảnh / nút** để chèn điều kiện trước dòng đó; không chọn dòng sẽ thêm ở cuối. **Sửa điều kiện** để đổi ảnh hoặc thời hạn.
 4. **Xuất file** tạo một file `.hocvet` nén gồm kịch bản, cài đặt phát và ảnh mẫu. Người nhận dùng **Nhập file** để thêm thành kịch bản mới. Không ghi đè kịch bản đang có; vẫn đọc được JSON cũ.
 5. Mở **Hướng dẫn** ngay trong ứng dụng để xem cách lưu, chia sẻ, gán phím và kiểm tra ảnh.
 
@@ -28,11 +38,14 @@ Gán phím đơn (F6, K) hoặc tổ hợp (Ctrl+Shift+K) cho các nút, từng 
 
 - Gõ tên phím hoặc bấm **Ghi phím**, rồi chọn **Lưu cài đặt**.
 - Chọn **Trong ứng dụng** hoặc **Toàn cục**. Phím toàn cục dùng được khi thu vào khay. Học và Dừng khẩn cấp luôn là toàn cục.
+- **Dừng học** luôn là toàn cục; gán phím `2` sẽ dừng được khi đang thao tác ở phần mềm khác. Cài đặt cũ ở phạm vi Trong ứng dụng được chuyển tự động cho lệnh này. Hàng số và bàn phím số đều được hỗ trợ.
 - Bỏ trống để bỏ gán, trừ Học và Dừng khẩn cấp. Các nút trong hộp thoại dùng phím theo ngữ cảnh. Khi gán phím, lắng nghe toàn cục tạm ngừng.
 - Báo lỗi khi phím trùng / chồng tổ hợp với lệnh hoặc kịch bản khác, ví dụ F6 và Ctrl+F6. Phím chữ đơn không lấy mất ký tự đang nhập trong ô văn bản.
 - Chọn **Khôi phục phím mặc định** rồi Lưu để đặt lại. Cài đặt được giữ qua cập nhật.
 
 ![Cài đặt phím tắt](docs/images/settings.png)
+
+![Đếm ngược khi chạy nền](docs/images/countdown.png)
 
 ## Dữ liệu và cập nhật
 
@@ -46,7 +59,8 @@ Lưu qua file tạm rồi thay thế; `.bak` giữ lần lưu trước và đư�
 - **Chờ ảnh:** chụp một vùng nhỏ, ổn định; mặc định cho phép 2% pixel khác màu rõ rệt. Ảnh được so sánh ở đúng tọa độ đã chụp, không tìm ở vị trí khác. Giữ cùng bố cục, vị trí cửa sổ, độ phân giải và DPI khi chạy / chia sẻ.
 - **Hết thời hạn:** kịch bản dừng và báo lỗi trước thao tác tiếp theo. Tốc độ phát không rút ngắn thời hạn chờ.
 - **Tiếng Việt:** ghi phím vật lý, bỏ qua phím do bộ gõ tự sinh. Giữ cùng bộ gõ Unicode, Telex/VNI, bố cục bàn phím và Caps Lock khi học / chạy. Kịch bản cũ bị lặp dấu cần học lại.
-- **Giao diện thống nhất:** màu kem, nút theo vai trò, ô nhập và hộp thoại dùng chung kiểu hiển thị. Trạng thái luôn hiện trên cùng; có cuộn và điều chỉnh theo DPI, hỗ trợ Tab / Enter / Space. Hộp chọn file sử dụng giao diện Windows.
+- **Mượt hơn:** không dựng lại danh sách cho từng sự kiện nhập; đếm số thao tác theo đợt và giới hạn tần suất cập nhật tiến độ. Kịch bản dài xem/sửa theo trang 1.000 bước, vẫn giữ đầy đủ mọi thao tác.
+- **Giao diện thống nhất:** màu kem, nút theo vai trò, ô nhập và hộp thoại dùng chung kiểu hiển thị. Trạng thái luôn hiện ở cuối cửa sổ; có cuộn và điều chỉnh theo DPI, hỗ trợ Tab / Enter / Space. Hộp chọn file sử dụng giao diện Windows.
 
 Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; kiểm tra trước khi chia sẻ. Chưa xác minh trên mọi phần mềm HIS / bộ gõ; thử kịch bản trên dữ liệu mẫu trước khi dùng thực tế.
 

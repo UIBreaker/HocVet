@@ -21,13 +21,13 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Callable
 
 from pynput import mouse, keyboard
 from app_info import APP_VERSION
 from conditions import condition_check, decode_reference
-from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity
+from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity, hotkey_identities
 
 
 # ==========================================
@@ -120,7 +120,8 @@ class MacroAction:
     tolerance: float = 0.02
 
     def to_dict(self) -> Dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        # Các trường là giá trị vô hướng; tránh deepcopy từng bước khi lưu kịch bản dài.
+        return {k: v for k, v in vars(self).items() if v is not None}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MacroAction":
@@ -200,9 +201,10 @@ class MacroRecorder:
         self._keyboard_listener: Optional[keyboard.Listener] = None
 
         # Phím điều khiển mặc định
-        self.hotkey_record_key = keyboard.Key.f8
-        self.hotkey_stop_key = keyboard.Key.esc
         self.control_hotkeys = ['F8', 'ESC']
+        self._control_combinations = [hotkey_identities(text) for text in self.control_hotkeys]
+        self.ignore_mouse: Optional[Callable[[int, int], bool]] = None
+        self.ignore_keyboard: Optional[Callable[[], bool]] = None
         self._pressed_keys = set()
         self._ignored_releases = set()
 
@@ -231,6 +233,8 @@ class MacroRecorder:
     def _on_mouse_click(self, x: int, y: int, button: mouse.Button, pressed: bool):
         if not self.is_recording:
             return
+        if self.ignore_mouse and self.ignore_mouse(x, y):
+            return
         delay = self._get_delay()
         action = MacroAction(
             action_type="mouse_click",
@@ -245,6 +249,8 @@ class MacroRecorder:
     def _on_mouse_scroll(self, x: int, y: int, dx: int, dy: int):
         if not self.is_recording:
             return
+        if self.ignore_mouse and self.ignore_mouse(x, y):
+            return
         delay = self._get_delay()
         action = MacroAction(
             action_type="mouse_scroll",
@@ -258,6 +264,8 @@ class MacroRecorder:
 
     def _on_mouse_move(self, x: int, y: int):
         if not self.is_recording or not self.record_movement:
+            return
+        if self.ignore_mouse and self.ignore_mouse(x, y):
             return
         now = time.perf_counter()
         if now - self._last_time < 0.03:
@@ -276,8 +284,7 @@ class MacroRecorder:
             return
         identity = key_identity(key)
         self._pressed_keys.add(identity)
-        combinations = [{key_identity(item) for item in parse_hotkey(text)} for text in self.control_hotkeys if text]
-        matched = next((combo for combo in combinations if combo <= self._pressed_keys), None)
+        matched = next((combo for combo in self._control_combinations if combo <= self._pressed_keys), None)
         if matched:
             self._ignored_releases.update(matched)
             # Không lưu Ctrl/Alt/Shift vừa bấm để dừng ghi vào cuối kịch bản.
@@ -285,6 +292,8 @@ class MacroRecorder:
                 while self.actions and self.actions[-1].action_type == 'key_press' and \
                         key_identity(str_to_key(self.actions[-1].key)) in matched & {'ctrl', 'alt', 'shift', 'cmd'}:
                     self.actions.pop()
+            return
+        if self.ignore_keyboard and self.ignore_keyboard():
             return
         delay = self._get_delay()
         action = MacroAction(
@@ -302,6 +311,8 @@ class MacroRecorder:
         if identity in self._ignored_releases:
             self._ignored_releases.discard(identity)
             return
+        if self.ignore_keyboard and self.ignore_keyboard():
+            return
         delay = self._get_delay()
         action = MacroAction(
             action_type="key_release",
@@ -316,6 +327,7 @@ class MacroRecorder:
         return not (data.flags & 0x12)  # LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED
 
     def start(self):
+        self._control_combinations = [hotkey_identities(text) for text in self.control_hotkeys if text]
         with self._lock:
             self.actions = []
             self._pressed_keys.clear()
@@ -748,6 +760,7 @@ class MacroStorage:
 # ==========================================
 class MacroManager:
     STATE_IDLE = "idle"
+    STATE_COUNTDOWN = 'countdown'
     STATE_RECORDING = "recording"
     STATE_PLAYING = "playing"
 
@@ -766,8 +779,11 @@ class MacroManager:
         self.button_hotkeys = {name: default for name, (_, default, _) in SHORTCUT_ACTIONS.items()
                                if name not in ('record', 'panic')}
         self.on_command = None
+        self.on_record_toggle = None
+        self.on_record_stopped = None
+        self.on_panic = None
         self.shortcuts_suspended = False
-        self.button_hotkey_scopes = {name: 'global' if name == 'show' else 'app'
+        self.button_hotkey_scopes = {name: 'global' if name in ('show', 'stop_record') else 'app'
                                      for name in self.button_hotkeys if SHORTCUT_ACTIONS[name][2] != 'dialog'}
 
         # Cài đặt ứng dụng
@@ -857,6 +873,8 @@ class MacroManager:
             self.hotkey_record_str = settings.get("hotkey_record", "F8")
             self.hotkey_panic_str = settings.get("hotkey_panic", "ESC")
             self.minimize_to_tray_on_close = settings.get("minimize_to_tray_on_close", True)
+        # Phím dừng học phải hoạt động khi người dùng đang thao tác ở phần mềm khác.
+        self.button_hotkey_scopes['stop_record'] = 'global'
 
     def save_library(self):
         settings = {
@@ -893,11 +911,11 @@ class MacroManager:
         # 2. Phím tắt Dừng khẩn cấp
         norm_panic = normalize_hotkey(self.hotkey_panic_str)
         if norm_panic:
-            hotkey_map[norm_panic] = self.stop_playing
+            hotkey_map[norm_panic] = self._on_hotkey_panic
 
         # 3. Phím tắt riêng cho TỪNG kịch bản được kích hoạt (Enabled)
         for profile in self.profiles:
-            if not profile.enabled or not profile.actions:
+            if not profile.enabled:
                 continue
             norm_hk = normalize_hotkey(profile.hotkey)
             if norm_hk and norm_hk not in hotkey_map:
@@ -905,7 +923,7 @@ class MacroManager:
                 hotkey_map[norm_hk] = (lambda p=profile: self._on_hotkey_play_profile(p))
 
         for action, hotkey in self.button_hotkeys.items():
-            if hotkey and self.button_hotkey_scopes.get(action) == 'global':
+            if hotkey and (action == 'stop_record' or self.button_hotkey_scopes.get(action) == 'global'):
                 hotkey_map.setdefault(normalize_hotkey(hotkey), lambda name=action: self._on_command_hotkey(name))
 
         try:
@@ -938,20 +956,30 @@ class MacroManager:
         self.hotkey_panic_str = values['panic'].strip().upper()
         self.button_hotkeys = {name: values.get(name, '').strip() for name in self.button_hotkeys}
         self.button_hotkey_scopes = {name: scopes.get(name, 'app') for name in self.button_hotkey_scopes}
+        self.button_hotkey_scopes['stop_record'] = 'global'
 
     def _on_command_hotkey(self, action):
         if self.on_command and (self.state == self.STATE_IDLE or
-                action == 'stop_record' and self.state == self.STATE_RECORDING):
+                action == 'stop_record' and self.state in (self.STATE_RECORDING, self.STATE_COUNTDOWN)):
             self.on_command(action)
 
+    def _on_hotkey_panic(self):
+        if self.on_panic:
+            self.on_panic()
+        else:
+            self.stop_playing()
+
     def _on_hotkey_toggle_record(self):
+        if self.on_record_toggle:
+            self.on_record_toggle()
+            return
         if self.state == self.STATE_IDLE:
             self.start_recording()
         elif self.state == self.STATE_RECORDING:
             self.stop_recording()
 
     def _on_hotkey_play_profile(self, profile: ScriptProfile):
-        if self.state == self.STATE_IDLE:
+        if self.state == self.STATE_IDLE and profile.enabled and profile.actions:
             self.set_active_profile(profile.id)
             if self.on_profile_triggered:
                 self.on_profile_triggered(profile)
@@ -961,7 +989,7 @@ class MacroManager:
     # GHI & PHÁT KỊCH BẢN
     # ------------------------------------------
     def start_recording(self, record_movement: bool = False):
-        if self.state != self.STATE_IDLE:
+        if self.state not in (self.STATE_IDLE, self.STATE_COUNTDOWN):
             return
         self.recorder.record_movement = record_movement
         self.recorder.control_hotkeys = [self.hotkey_record_str, self.hotkey_panic_str,
@@ -973,13 +1001,18 @@ class MacroManager:
         if self.state != self.STATE_RECORDING:
             return []
         recorded = self.recorder.stop()
-        self._set_state(self.STATE_IDLE)
         # Tự động gán vào profile hiện tại hoặc trả về
         active = self.get_active_profile()
         if active:
             active.actions = recorded
-            self.save_library()
-        self.reload_global_hotkeys()
+            try:
+                self.save_library()
+            except OSError as error:
+                self._set_state(self.STATE_IDLE)
+                raise OSError(f'Đã dừng học nhưng chưa lưu được: {error}. Kịch bản vẫn trong ứng dụng; hãy xuất ra file hoặc thử lưu lại.') from error
+        self._set_state(self.STATE_IDLE)
+        if self.on_record_stopped:
+            self.on_record_stopped(active, len(recorded))
         return recorded
 
     def start_playing_profile(self, profile: ScriptProfile):

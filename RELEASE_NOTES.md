@@ -1,25 +1,21 @@
-# Học Vẹt v0.12.0
+# Học Vẹt v0.13.0
 
-- Đổi tên ứng dụng từ Smart Operation thành Học Vẹt; đồng bộ màn hình chính, Cài đặt, Hướng dẫn, nhập dữ liệu, điều kiện chờ, thông báo lỗi và xác nhận xóa.
-- Sửa luồng ghi tiếng Việt: lưu mã phím vật lý và bỏ qua phím do bộ gõ tự sinh để tránh lặp chữ / dấu. Kịch bản cũ bị lỗi cần học lại với cùng chế độ gõ.
-- Xuất một kịch bản thành một file `.hocvet` nén, gồm cả ảnh mẫu; nhập thêm thành kịch bản mới, vẫn hỗ trợ JSON cũ.
-- Giữ thư viện và phím tắt tại `%LOCALAPPDATA%\HocVet`, có lưu bằng file tạm và bản dự phòng `.bak`; cập nhật EXE không ghi đè thư viện.
-- Thêm chờ cửa sổ phía trước hoặc ảnh / nút tại vùng chụp. Hết hạn sẽ dừng và báo lỗi; Esc vẫn dừng ngay khi đang chờ.
-- Gán phím đơn / tổ hợp cho các nút, tốc độ và tùy chọn. Có ghi phím trực tiếp, chọn phạm vi Trong ứng dụng / Toàn cục và kiểm tra tổ hợp trùng nhau.
-- Thanh trạng thái cố định, phím điều khiển theo ngữ cảnh, hỗ trợ cuộn, bàn phím và DPI. Phiên bản ứng dụng dùng một nguồn thông tin chung.
+- Bố cục mới theo bảng điều khiển mẫu: nền kem, tiêu đề dạng công nghiệp, thanh trượt đỏ và nút nổi vàng / xanh / đỏ. Màn hình chính còn ba bước chọn kịch bản, điều chỉnh, học/chạy; công cụ sửa bước được đưa vào phần Chi tiết.
+- F8 chạy nền đi qua cùng luồng với nút Học. Có thông báo nổi 3–2–1, bắt đầu học và dừng/lưu thành công, không lấy tiêu điểm của phần mềm đang nhập.
+- Phím Dừng học luôn hoạt động toàn cục. Sửa trường hợp gán phím số 2 nhưng không dừng được khi ứng dụng đang thu vào khay; hỗ trợ cả bàn phím số và chuyển cấu hình cũ tự động.
+- Bỏ qua bấm/cuộn chuột trên cửa sổ Học Vẹt, gồm cú bấm nút Dừng; không đưa phím điều khiển vào kịch bản.
+- Giảm vẽ lại khi ghi, cập nhật tiến độ có giới hạn, không phân tích lại phím tắt mỗi lần gõ, tránh sao chép sâu dữ liệu khi lưu.
+- Phân trang danh sách bước (1.000 bước/trang), vẫn lưu đủ kịch bản và sửa đúng chỉ số thao tác gốc.
+- Hủy được đếm ngược bằng F8, phím dừng hoặc Esc mà không thay đổi kịch bản cũ. Khi lưu thất bại không báo thành công; dữ liệu mới vẫn giữ trong bộ nhớ để xuất ra file.
 
-## Tải xuống
+## Nâng cấp
 
-- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
-- `HocVet-v0.12.0-Windows.zip`: EXE, hướng dẫn, ghi chú phát hành và giấy phép.
-- `SHA256SUMS.txt`: mã SHA-256 của hai file tải xuống.
+Dữ liệu và cài đặt vẫn ở `%LOCALAPPDATA%\HocVet`. Không xóa thư mục này khi thay EXE. Nếu gán phím số 2 để dừng học, việc nhập số 2 trong khi đang học cũng sẽ kết thúc lượt học; có thể chọn F6 hoặc tổ hợp khác nếu cần nhập số 2 trong kịch bản.
 
-## Nâng cấp và dữ liệu
+## File đóng gói
 
-Lần đầu nâng cấp từ Smart Operation: đặt EXE cạnh `scripts_library.json` cũ trước khi mở để chuyển dữ liệu. Nếu EXE trong `dist`, ứng dụng cũng kiểm tra thư mục cha. Thư viện cũ được giữ nguyên. Gói phát hành không kèm thư viện cá nhân.
+- `HocVet.exe`: file chạy Windows.
+- `HocVet-v0.13.0-Windows.zip`: ứng dụng, hướng dẫn, ảnh giao diện và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra hai file trên.
 
-Chờ ảnh so sánh ở đúng tọa độ và DPI đã chụp; giữ nguyên bố cục khi chia sẻ kịch bản. Chưa xác minh trên mọi phần mềm HIS và bộ gõ.
-
-## Kiểm tra
-
-Kiểm thử core, lưu / khôi phục dữ liệu, xuất / nhập, điều kiện chờ, phím tắt và hộp thoại. Đã kiểm tra hiển thị ở tỷ lệ chữ 100% và 150% mô phỏng.
+Đã kiểm thử luồng đếm ngược/chạy nền, phím dừng, bỏ qua chuột trên giao diện, lưu dữ liệu, phím tắt và hiệu năng cập nhật giao diện. Chưa xác minh trực tiếp trên mọi phần mềm HIS / bộ gõ.

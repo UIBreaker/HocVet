@@ -72,6 +72,25 @@ class ThemeTests(unittest.TestCase):
         self.assertEqual(observations, [1])
         self.assertEqual(result, 1.25)
 
+    def test_record_notice_visible_with_hidden_root_without_focus_change(self):
+        import ctypes
+        from ctypes import wintypes
+        from record_notice import RecordNotice
+        self.root.update()
+        ctypes.windll.user32.GetForegroundWindow.restype = wintypes.HWND
+        before = ctypes.windll.user32.GetForegroundWindow()
+        notice = RecordNotice(self.root)
+        try:
+            notice.show('Sắp bắt đầu học', 'Chuyển sang phần mềm cần thao tác', number=3)
+            self.root.update()
+            self.assertTrue(notice.window.winfo_ismapped())
+            self.assertEqual(notice.number.cget('text'), '3')
+            self.assertEqual(ctypes.windll.user32.GetForegroundWindow(), before)
+            notice.show('Đã dừng và lưu', '12 thao tác', duration=1000)
+            self.assertEqual(notice.title.cget('text'), 'Đã dừng và lưu')
+        finally:
+            notice.close()
+
 
 class PackageTests(unittest.TestCase):
     def test_package_manifest_and_checksums_exclude_personal_library(self):
