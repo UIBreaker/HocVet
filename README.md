@@ -1,21 +1,20 @@
-# Học Vẹt · v0.15.1
+# Học Vẹt · v0.16.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.15.1
+## Có gì mới trong 0.16.0
 
-- Bảng nổi có tiến trình, danh sách kịch bản và nút Chạy; ứng dụng thu vào khay trước khi phát.
-- Chuột của kịch bản xuyên qua bảng nổi tới cửa sổ bên dưới; tọa độ trùng bảng không làm dừng và không bấm nhầm nút.
-- Chuột thật vẫn bấm được **Dừng** khi chọn chế độ chuột; thao tác phát không được xem là cú bấm Dừng của người dùng.
-- Hai chế độ loại trừ nhau: **dùng chuột** tắt toàn bộ phím đã gán, kể cả Dừng khẩn cấp; **dùng phím** khóa nút Học / Chạy / Dừng bằng chuột.
+- Chỉnh số lần lặp riêng cho từng kịch bản ngay trên bảng nổi bằng **− / +** hoặc bấm số để nhập; **0 = lặp liên tục**.
+- Kéo cạnh / góc để đổi kích thước bảng; số kịch bản mỗi trang tự điều chỉnh theo khung.
+- Ghi nhớ số lần lặp và kích thước qua lần mở / cập nhật; khóa chỉnh khi đang học / chạy.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.15.1-Windows.zip** tại [bản phát hành 0.15.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.15.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.16.0-Windows.zip** tại [bản phát hành 0.16.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.16.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -63,6 +62,18 @@ Bấm vào bảng không được ghi thành thao tác. Khi phát macro màn hì
 ![Bảng nổi tiến trình và kịch bản](docs/images/tray-panel.png)
 
 ![Bảng nổi khi sẵn sàng](docs/images/tray-panel-idle.png)
+
+## Số lần lặp và kích thước bảng (v0.16)
+
+Dưới mỗi kịch bản có **−**, **số lần**, **+**. Bấm −/+ để đổi từng đơn vị hoặc bấm số để nhập trực tiếp. Nhập **0** nếu muốn chạy liên tục đến khi Dừng. Giá trị được lưu riêng cho đúng kịch bản và đồng bộ với ô Lặp lại trên màn hình chính; nếu lưu thất bại ứng dụng giữ số cũ và báo lỗi.
+
+Kéo bất kỳ cạnh hoặc góc của bảng nổi để đổi kích thước. Bảng hẹp / thấp sẽ hiển thị ít kịch bản hơn trên một trang; bảng cao sẽ hiển thị nhiều hơn. Có giới hạn nhỏ nhất để giữ nút Dừng và điều hướng đọc được, và giới hạn theo vùng màn hình làm việc. Kích thước được lưu khi thả chuột, không ghi file liên tục khi kéo.
+
+Chỉ chỉnh lặp và kích thước khi đang dừng; trong lúc học / chạy các điều khiển này được khóa để giữ ổn định vùng bấm xuyên bảng. Cả chế độ phím và chuột đều có thể chỉnh cấu hình lúc rảnh; việc kích hoạt kịch bản vẫn tuân theo chế độ đã chọn.
+
+![Bảng nổi thu nhỏ](docs/images/tray-panel-small.png)
+
+![Bảng nổi phóng lớn](docs/images/tray-panel-large.png)
 
 ## Cài đặt phím tắt
 

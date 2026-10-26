@@ -639,8 +639,44 @@ class HocVetApp:
         self.root.withdraw()
         self.workspace.set_visible(False)
         self.record_notice.pin(self.manager.profiles, self._run_from_panel, self._cmd_emergency_stop,
-            self._show_from_tray, self.manager.script_activation)
+            self._show_from_tray, self.manager.script_activation, on_repeat=self._set_panel_repeat,
+            size=self.manager.panel_size, on_resize=self._save_panel_size)
         self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
+
+    def _set_panel_repeat(self, profile_id, value=None):
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
+        profile = next((p for p in self.manager.profiles if p.id==profile_id),None)
+        if not profile: return
+        if value is None:
+            value = simpledialog.askstring('Số lần lặp', f'{profile.name}\nNhập số lần lặp; 0 = liên tục.',
+                initialvalue=str(profile.loop_count),parent=self.record_notice.window or self.root)
+        if value is None: return
+        try:
+            count = int(str(value).strip())
+            if count < 0: raise ValueError()
+        except ValueError:
+            self.notify_app('Số lần lặp không hợp lệ','Nhập số nguyên từ 0 trở lên; 0 = liên tục.')
+            return
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
+        previous = profile.loop_count
+        profile.loop_count = count
+        try:
+            self.manager.save_library()
+        except OSError as error:
+            profile.loop_count = previous
+            self.notify_app('Chưa lưu được số lần lặp',str(error))
+            return
+        self._refresh_profile_deck()
+        self.notify_app('Đã lưu số lần lặp', f'{profile.name} · {"Liên tục" if count==0 else str(count)+" lần"}')
+
+    def _save_panel_size(self, width, height):
+        previous = self.manager.panel_size
+        self.manager.panel_size = [width,height]
+        try:
+            self.manager.save_library()
+        except OSError as error:
+            self.manager.panel_size = previous
+            self.notify_app('Chưa lưu được kích thước bảng',str(error))
 
     def _show_from_tray(self):
         """Khôi phục cửa sổ từ khay hệ thống."""
@@ -1251,6 +1287,7 @@ class HocVetApp:
 
     def _cmd_start_playing(self, from_hotkey=False):
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
+        if self._shortcut_dialogs: return
         if self._pending_play is not None: return
         if self.manager.external_busy:
             self.notify_app('Công việc riêng đang chạy', 'Không chạy đồng thời chuột màn hình.'); return
@@ -1287,6 +1324,7 @@ class HocVetApp:
 
     def _run_from_panel(self, profile_id, from_hotkey=False):
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
+        if self._shortcut_dialogs: return
         if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
         profile = next((p for p in self.manager.profiles if p.id == profile_id), None)
         if not profile or not profile.enabled or not profile.actions: return
@@ -1607,6 +1645,8 @@ Cập nhật / thay file ứng dụng không xóa thư viện. File .bak giữ l
 12. Dùng Tab, Enter / Space để thao tác. Vào Cài đặt để gán phím cho các nút, kể cả công việc riêng; chọn Trong ứng dụng / Toàn cục. Phím Dừng học hoặc Dừng khẩn cấp cũng dừng công việc riêng.
 13. Bấm Chạy sẽ thu vào khay trước rồi bắt đầu. Bảng nổi luôn có tiến trình và kịch bản bên dưới; bấm Chạy từng dòng, Trước / Sau hoặc lăn chuột để chuyển trang. Dừng vẫn dùng được khi đang chạy; nút Mở ứng dụng dùng sau khi đã dừng.
 14. Kéo tiêu đề bảng khi rảnh để đổi vị trí. Khi phát, chuột của kịch bản xuyên qua bảng tới cửa sổ bên dưới, không làm dừng kịch bản hoặc bấm các nút trên bảng. Ở chế độ chuột, chỉ cú bấm chuột thật vào Dừng mới dừng; ở chế độ phím dùng phím Dừng đã gán. Sau khi phát xong bảng nhận chuột trở lại.
+15. Dưới mỗi kịch bản trên bảng nổi có −/+, bấm vào số để nhập số lần lặp. 0 là lặp liên tục. Mỗi kịch bản giữ số riêng, tự lưu và đồng bộ với màn hình chính.
+16. Kéo cạnh / góc bảng nổi để đổi chiều rộng, chiều cao. Số kịch bản mỗi trang tự điều chỉnh; kích thước được ghi nhớ khi thả chuột. Chỉ chỉnh lặp / kích thước khi đã dừng để giữ vùng bấm xuyên bảng ổn định.
 
 Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; kiểm tra nội dung trước khi chia sẻ.
 """)

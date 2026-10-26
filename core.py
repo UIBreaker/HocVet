@@ -813,6 +813,7 @@ class MacroManager:
 
         # Cài đặt ứng dụng
         self.minimize_to_tray_on_close = True
+        self.panel_size = None
         self.script_activation = 'mouse'
 
         # Global HotKeys Listener
@@ -907,6 +908,9 @@ class MacroManager:
             self.minimize_to_tray_on_close = settings.get("minimize_to_tray_on_close", True)
             activation = settings.get('script_activation', 'mouse')
             self.script_activation = activation if activation in ('mouse', 'hotkey') else 'mouse'
+            size = settings.get('panel_size')
+            if isinstance(size,list) and len(size)==2 and all(type(v) is int and 0 < v <= 20000 for v in size):
+                self.panel_size = size
         # Phím dừng học phải hoạt động khi người dùng đang thao tác ở phần mềm khác.
         self.button_hotkey_scopes['stop_record'] = 'global'
 
@@ -916,6 +920,7 @@ class MacroManager:
             "hotkey_panic": self.hotkey_panic_str,
             "minimize_to_tray_on_close": self.minimize_to_tray_on_close,
             "script_activation": self.script_activation,
+            "panel_size": self.panel_size,
             "button_hotkeys": self.button_hotkeys,
             "button_hotkey_scopes": self.button_hotkey_scopes,
         }

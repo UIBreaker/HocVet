@@ -1,3 +1,23 @@
+# Học Vẹt v0.16.0
+
+- Thêm bộ chỉnh số lần lặp cho từng kịch bản trên bảng nổi: −/+, bấm số để nhập trực tiếp, 0 là liên tục. Lưu riêng cho từng kịch bản, đồng bộ với màn hình chính và giữ số cũ nếu lưu thất bại.
+- Kéo cả bốn cạnh hoặc bốn góc để tăng / giảm chiều rộng, chiều cao của bảng. Tự chia lại số kịch bản mỗi trang theo chiều cao và xuống dòng tên theo chiều rộng; giữ nút Dừng / điều hướng trong khung.
+- Ghi nhớ kích thước bảng trong dữ liệu ứng dụng sau khi thả chuột, giữ qua lần chạy / cập nhật sau. Giới hạn nhỏ nhất để các nút còn đọc được, lớn nhất theo vùng làm việc của màn hình.
+- Khóa chỉnh lặp và kích thước khi đang học / chạy để giữ vùng chuột xuyên bảng ổn định. Chỉnh cấu hình được ở cả hai chế độ; các quy tắc kích hoạt bằng chuột / phím không thay đổi.
+- Kiểm thử chỉnh riêng từng kịch bản, nhập số khi cửa sổ chính đang ẩn, hủy / dữ liệu sai / lỗi lưu, lưu kích thước, thu nhỏ / phóng lớn và chuột xuyên bảng.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu, số lần lặp và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.16.0-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Mặc định dùng chuột: bấm **Dừng** trên bảng nổi. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**. Macro màn hình dùng chuột thật; các giới hạn Windows / HIS trong README vẫn áp dụng. Chưa xác minh trên HIS thực tế.
+
+---
+
 # Học Vẹt v0.15.1
 
 - Từ v0.14.1: thêm bảng nổi có tiến trình và danh sách kịch bản, thu cửa sổ chính vào khay trước khi chạy; lưu lựa chọn kích hoạt bằng chuột hoặc phím.

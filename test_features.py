@@ -1,6 +1,7 @@
 """Kiểm tra lưu bền vững, chia sẻ và điều kiện chờ; không bấm phím/chuột thật."""
 import base64
 import io
+import gc
 import os
 from pathlib import Path
 import tempfile
@@ -355,6 +356,55 @@ class FeaturesTest(unittest.TestCase):
 
 
 class UITest(unittest.TestCase):
+    def test_panel_repeat_number_opens_visible_editor_with_hidden_main(self):
+        import tkinter as tk
+        from tkinter import ttk
+        self.app._hide_to_tray()
+        self.root.update()
+        def edit():
+            dialog=next(w for w in self.app.record_notice.window.winfo_children() if isinstance(w,tk.Toplevel))
+            self.assertTrue(dialog.winfo_ismapped())
+            entry=next(w for w in dialog.body.winfo_children() if isinstance(w,ttk.Entry))
+            entry.delete(0,'end');entry.insert(0,'12')
+            next(w for w in dialog.footer.winfo_children() if isinstance(w,ttk.Button) and w.cget('text')=='Lưu').invoke()
+        self.root.after(40,edit)
+        self.app._set_panel_repeat(self.profile.id)
+        self.assertEqual(self.profile.loop_count,12)
+
+    def _destroy_ui(self):
+        self.root.destroy()
+        self.app = None
+        self.root = None
+        gc.collect()
+
+    def test_panel_repeat_edits_selected_profile_only_and_persists(self):
+        second=ScriptProfile(name='Công việc hai',actions=[MacroAction('key_press',0,key='b')])
+        self.app.manager.profiles.append(second)
+        self.app._set_panel_repeat(second.id,'17')
+        self.assertEqual(second.loop_count,17)
+        self.assertEqual(self.profile.loop_count,1)
+        self.assertEqual(self.app.manager.active_profile_id,self.profile.id)
+        restored=MacroManager(self.app.manager.library_path)
+        self.assertEqual(next(p.loop_count for p in restored.profiles if p.id==second.id),17)
+        self.app._set_panel_repeat(self.profile.id,0)
+        self.assertEqual(self.app.loop_count_var.get(),'0')
+        self.app.manager.external_busy=True
+        self.app._set_panel_repeat(second.id,4)
+        self.assertEqual(second.loop_count,17)
+
+    def test_panel_repeat_validation_cancel_save_failure_and_size_persistence(self):
+        with patch.object(self.app,'notify_app'),patch.object(self.ui.simpledialog,'askstring',return_value=None):
+            self.app._set_panel_repeat(self.profile.id)
+            for value in ('-1','2.5','abc'):self.app._set_panel_repeat(self.profile.id,value)
+        self.assertEqual(self.profile.loop_count,1)
+        with patch.object(self.app.manager,'save_library',side_effect=OSError('disk full')),patch.object(self.app,'notify_app'):
+            self.app._set_panel_repeat(self.profile.id,8)
+            self.app._save_panel_size(480,680)
+        self.assertEqual(self.profile.loop_count,1)
+        self.assertIsNone(self.app.manager.panel_size)
+        self.app._save_panel_size(480,680)
+        self.assertEqual(MacroManager(self.app.manager.library_path).panel_size,[480,680])
+
     def test_keyboard_mode_disables_mouse_activation_and_mouse_mode_unbinds_all_hotkeys(self):
         self.app._handle_state_ui(MacroManager.STATE_IDLE)
         for button in (self.app.btn_rec,self.app.btn_play,self.app.btn_stop,self.app.btn_panic):
@@ -528,7 +578,7 @@ class UITest(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = tk.Tk()
         self.root.withdraw()
-        self.addCleanup(self.root.destroy)
+        self.addCleanup(self._destroy_ui)
         self.hotkeys = patch.object(MacroManager, 'start_global_hotkeys')
         self.hotkeys.start()
         self.addCleanup(self.hotkeys.stop)

@@ -1,5 +1,6 @@
 """Kiểm tra các hộp thoại dùng giao diện chung và hành vi Lưu / Hủy."""
 import tkinter as tk
+import gc
 from tkinter import ttk
 import unittest
 from pathlib import Path
@@ -13,6 +14,43 @@ from ui_theme import apply_theme, create_dialog, ThemedInputs, ThemedMessages, V
 
 
 class ThemeTests(unittest.TestCase):
+    def _destroy_root(self):
+        self.root.destroy()
+        self.root = None
+        gc.collect()
+
+    def test_panel_repeat_controls_and_resizing_reflow_without_clipping_stop(self):
+        from record_notice import RecordNotice
+        from core import ScriptProfile,MacroAction
+        from unittest.mock import Mock
+        profiles=[ScriptProfile(name=f'Kịch bản {i}',actions=[MacroAction('key_press',0,key='a')]) for i in range(20)]
+        notice=RecordNotice(self.root);self.addCleanup(lambda:notice.close(force=True))
+        repeat=Mock();resized=Mock()
+        notice.pin(profiles,Mock(),Mock(),Mock(),on_repeat=repeat,on_resize=resized)
+        self.root.update()
+        notice.repeat_buttons[2].invoke()
+        repeat.assert_called_with(profiles[0].id,2)
+        notice.repeat_buttons[1].invoke()
+        repeat.assert_called_with(profiles[0].id,None)
+        notice.resize(340,300)
+        self.root.update()
+        self.assertEqual(notice.per_page,1)
+        self.assertTrue(notice.stop_button.winfo_ismapped())
+        self.assertLessEqual(notice.stop_button.winfo_rooty()+notice.stop_button.winfo_height(),notice.window.winfo_rooty()+notice.window.winfo_height())
+        notice.resize(500,900)
+        self.root.update()
+        self.assertGreater(notice.per_page,1)
+        self.assertGreater(int(notice.name_labels[0].cget('wraplength')),200)
+        previous=(notice.window.winfo_width(),notice.window.winfo_height())
+        notice.show('Tiến trình','Không đổi kích thước khi cập nhật',progress=50)
+        self.root.update()
+        self.assertEqual(previous,(notice.window.winfo_width(),notice.window.winfo_height()))
+        notice.set_busy(True)
+        notice.resize(700,950)
+        self.root.update()
+        self.assertEqual(previous,(notice.window.winfo_width(),notice.window.winfo_height()))
+        self.assertTrue(all('disabled' in button.state() for button in notice.repeat_buttons))
+
     def test_pinned_panel_pages_scripts_keeps_progress_and_disables_runs_when_busy(self):
         from record_notice import RecordNotice
         from core import ScriptProfile, MacroAction
@@ -38,7 +76,7 @@ class ThemeTests(unittest.TestCase):
         self.root = tk.Tk()
         self.root.withdraw()
         apply_theme(self.root, self.root.winfo_fpixels('1i') / 96)
-        self.addCleanup(self.root.destroy)
+        self.addCleanup(self._destroy_root)
 
     def dialog(self):
         return next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel))
