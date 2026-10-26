@@ -311,6 +311,34 @@ class FeaturesTest(unittest.TestCase):
 
 
 class UITest(unittest.TestCase):
+    def test_tabs_speed_and_app_only_progress_notification(self):
+        from tkinter import ttk
+        self.assertEqual(len(self.app.tabs.tabs()), 4)
+        self.app._cmd_open_settings()
+        self.assertEqual(self.app.tabs.select(), str(self.app.settings_tab))
+        def descendants(widget):
+            for child in widget.winfo_children():
+                yield child
+                yield from descendants(child)
+        self.assertFalse(any(isinstance(w, ttk.Scrollbar) for w in descendants(self.app.tabs)))
+        self.app._set_speed('10x')
+        self.assertEqual(self.app._parse_speed(), 10)
+        with patch.object(self.app.record_notice, 'show') as notice:
+            self.app.notify_app('Tiến độ', '4/10', progress=40)
+        notice.assert_called_once_with('Tiến độ', '4/10', duration=None, progress=40)
+
+    def test_workspace_import_keeps_desktop_macro_separate(self):
+        panel = self.app.workspace
+        with self.assertRaises(ValueError):
+            panel._accept({'actions': [a.to_dict() for a in self.profile.actions]})
+        panel._accept({'workspace_script': True, 'version': 1, 'mode': 'web', 'size': [1280,720],
+            'name': 'Mẫu riêng', 'url': 'about:blank', 'actions': [{'kind':'text','text':'Khám sức khoẻ'}]})
+        self.assertTrue(panel._needs_open)
+        self.assertEqual(len(self.profile.actions), 1)
+        panel.save()
+        self.assertTrue(panel.library_path.exists())
+        self.assertEqual(panel._data()['actions'][0]['text'], 'Khám sức khoẻ')
+
     def setUp(self):
         import tkinter as tk
         import ui
@@ -396,7 +424,7 @@ class UITest(unittest.TestCase):
         self.root.update()
         self.app._cmd_open_settings()
         self.root.update()
-        dialog = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel))
+        dialog = self.app.settings_tab
         self.assertTrue(self.app.manager.shortcuts_suspended)
         self.assertEqual(set(self.app.shortcut_entries), set(SHORTCUT_ACTIONS))
         self.assertEqual(set(self.app._shortcut_commands),
@@ -420,8 +448,9 @@ class UITest(unittest.TestCase):
         # Ghi trực tiếp một tổ hợp vào dòng Thêm chờ cửa sổ.
         entry = entries['wait_window']
         rows = entry.master
-        row = entry.grid_info()['row']
-        capture = next(w for w in rows.grid_slaves(row=row) if isinstance(w, ttk.Button))
+        self.app._show_settings_page(list(SHORTCUT_ACTIONS).index('wait_window')//6)
+        self.root.update()
+        capture = next(w for w in rows.grid_slaves(row=entry.grid_info()['row']) if isinstance(w, ttk.Button))
         capture.invoke()
         entry.focus_force()
         self.root.update()
@@ -456,7 +485,7 @@ class UITest(unittest.TestCase):
         from tkinter import ttk
         self.app._cmd_open_settings()
         self.root.update()
-        dialog = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel))
+        dialog = self.app.settings_tab
         entry = self.app.shortcut_entries['help']
         entry.delete(0, 'end')
         entry.insert(0, 'F6')
@@ -465,14 +494,15 @@ class UITest(unittest.TestCase):
         with patch.object(self.app.manager, 'save_library', side_effect=OSError('disk unavailable')), patch('ui.messagebox.showerror'):
             save.invoke()
         self.assertEqual(self.app.manager.button_hotkeys['help'], 'F1')
-        dialog.destroy()
+        self.app.tabs.select(self.app.content)
+        self.app._tab_changed()
 
     def test_background_f8_countdown_digit_stop_and_saved_notice(self):
         from pynput import keyboard
         app = self.app
         app.manager.button_hotkeys['stop_record'] = '2'
         original = list(self.profile.actions)
-        with patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_windows'), \
+        with patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_app'), \
                 patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'):
             self.root.withdraw()
             app.manager._on_hotkey_toggle_record()
@@ -537,7 +567,7 @@ class UITest(unittest.TestCase):
         self.root.lift()
         self.root.update()
         with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'), \
-                patch.object(app.record_notice, 'show'), patch.object(app, 'notify_windows'):
+                patch.object(app.record_notice, 'show'), patch.object(app, 'notify_app'):
             app.manager.start_recording()
             app._process_ui_events()
             self.root.focus_force()
@@ -569,10 +599,11 @@ class UITest(unittest.TestCase):
     def test_large_preview_keeps_correct_original_action_index(self):
         self.profile.actions = [MacroAction('key_press', 0, key='a') for _ in range(2000)]
         self.app._refresh_action_tree()
-        self.assertEqual(len(self.app.tree.get_children()), 1000)
+        self.assertEqual(len(self.app.tree.get_children()), 12)
         self.assertEqual(self.app.tree.get_children()[0], '0')
-        self.app._change_preview(1)
-        self.assertEqual(self.app.tree.get_children()[0], '1000')
+        self.app._preview_start=1500
+        self.app._refresh_action_tree()
+        self.assertEqual(self.app.tree.get_children()[0], '1500')
         self.app.tree.selection_set('1500')
         with patch('ui.simpledialog.askfloat', return_value=1.25):
             self.app._cmd_edit_delay()
@@ -583,7 +614,7 @@ class UITest(unittest.TestCase):
         from pynput import keyboard
         app = self.app
         with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'), \
-                patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_windows'), \
+                patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_app'), \
                 patch.object(app.manager, 'save_library', side_effect=OSError('disk unavailable')):
             app.manager.start_recording()
             app.manager.recorder._on_key_press(keyboard.KeyCode.from_vk(65, char='a'))

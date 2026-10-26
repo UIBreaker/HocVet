@@ -1,22 +1,24 @@
-# Học Vẹt · v0.13.0
+# Học Vẹt · v0.14.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.13.0
+## Có gì mới trong 0.14.0
 
-- Giao diện bảng điều khiển mới, ba bước chọn kịch bản, điều chỉnh và học/chạy.
-- Thông báo nổi đếm ngược **3–2–1**, đang học và đã lưu, kể cả khi thu vào khay.
-- Sửa phím **Dừng học** toàn cục, hỗ trợ hàng số và bàn phím số; bỏ qua thao tác trên cửa sổ Học Vẹt khi ghi.
-- Ghi/phát mượt hơn; xem và sửa kịch bản dài theo trang **1.000 bước**, vẫn lưu đủ thao tác.
-- Hủy đếm ngược mà không mất kịch bản cũ; chỉ báo lưu thành công khi đã lưu xong.
+- Bốn tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt**; danh sách chia trang.
+- **Công việc riêng:** học và chạy trong Edge riêng hoặc cửa sổ Windows / HIS tương thích, không chiếm chuột thật.
+- Tốc độ **1×–10×**, có thể gán phím cho từng mức và các nút Công việc.
+- Thông báo nổi có **thanh tiến độ**, thay thông báo Windows.
+- Tự lưu, nhập và chia sẻ công việc bằng JSON; tiếp tục chạy khi đổi tab hoặc thu vào khay.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.13.0-Windows.zip** tại [bản phát hành 0.13.0](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.13.0). Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+Tải **HocVet.exe** hoặc **HocVet-v0.14.0-Windows.zip** tại [bản phát hành 0.14.0](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.14.0). Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+
+Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
 Khi nâng cấp từ Smart Operation, đặt ứng dụng cạnh `scripts_library.json` cũ trước lần mở đầu tiên. Nếu chạy từ thư mục `dist`, ứng dụng cũng kiểm tra thư mục cha. File cũ được giữ nguyên. Từ lần sau có thể thay / di chuyển file ứng dụng mà vẫn giữ thư viện.
 
@@ -29,6 +31,12 @@ Khi nâng cấp từ Smart Operation, đặt ứng dụng cạnh `scripts_librar
 3. Mở **Chi tiết / sửa bước**, chọn một dòng, dùng **+ Chờ cửa sổ** / **+ Chờ ảnh / nút** để chèn điều kiện trước dòng đó; không chọn dòng sẽ thêm ở cuối. **Sửa điều kiện** để đổi ảnh hoặc thời hạn.
 4. **Xuất file** tạo một file `.hocvet` nén gồm kịch bản, cài đặt phát và ảnh mẫu. Người nhận dùng **Nhập file** để thêm thành kịch bản mới. Không ghi đè kịch bản đang có; vẫn đọc được JSON cũ.
 5. Mở **Hướng dẫn** ngay trong ứng dụng để xem cách lưu, chia sẻ, gán phím và kiểm tra ảnh.
+
+Tab **Chính** điều chỉnh tốc độ từ **1× đến 10×**. Tab **Chi tiết / sửa bước** hiển thị **12 bước/trang**; tab **Cài đặt** hiển thị **6 lệnh/trang**. Chuyển trang để xem đủ các bước và phím tắt.
+
+![Chi tiết và sửa bước](docs/images/details.png)
+
+![Thông báo tiến độ](docs/images/progress.png)
 
 Các phím trên là mặc định, có thể đổi trong Cài đặt.
 
@@ -59,10 +67,24 @@ Lưu qua file tạm rồi thay thế; `.bak` giữ lần lưu trước và đư�
 - **Chờ ảnh:** chụp một vùng nhỏ, ổn định; mặc định cho phép 2% pixel khác màu rõ rệt. Ảnh được so sánh ở đúng tọa độ đã chụp, không tìm ở vị trí khác. Giữ cùng bố cục, vị trí cửa sổ, độ phân giải và DPI khi chạy / chia sẻ.
 - **Hết thời hạn:** kịch bản dừng và báo lỗi trước thao tác tiếp theo. Tốc độ phát không rút ngắn thời hạn chờ.
 - **Tiếng Việt:** ghi phím vật lý, bỏ qua phím do bộ gõ tự sinh. Giữ cùng bộ gõ Unicode, Telex/VNI, bố cục bàn phím và Caps Lock khi học / chạy. Kịch bản cũ bị lặp dấu cần học lại.
-- **Mượt hơn:** không dựng lại danh sách cho từng sự kiện nhập; đếm số thao tác theo đợt và giới hạn tần suất cập nhật tiến độ. Kịch bản dài xem/sửa theo trang 1.000 bước, vẫn giữ đầy đủ mọi thao tác.
-- **Giao diện thống nhất:** màu kem, nút theo vai trò, ô nhập và hộp thoại dùng chung kiểu hiển thị. Trạng thái luôn hiện ở cuối cửa sổ; có cuộn và điều chỉnh theo DPI, hỗ trợ Tab / Enter / Space. Hộp chọn file sử dụng giao diện Windows.
+- **Mượt hơn:** không dựng lại danh sách cho từng sự kiện nhập; đếm số thao tác theo đợt và giới hạn tần suất cập nhật tiến độ. Kịch bản dài xem/sửa theo trang 12 bước, vẫn giữ đầy đủ mọi thao tác.
+- **Giao diện thống nhất:** màu kem, nút theo vai trò, ô nhập và hộp thoại dùng chung kiểu hiển thị. Trạng thái luôn hiện ở cuối cửa sổ; chia tab và điều chỉnh theo DPI, hỗ trợ Tab / Enter / Space. Hộp chọn file sử dụng giao diện Windows.
 
 Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; kiểm tra trước khi chia sẻ. Chưa xác minh trên mọi phần mềm HIS / bộ gõ; thử kịch bản trên dữ liệu mẫu trước khi dùng thực tế.
+
+## Công việc riêng (v0.14)
+
+Bốn tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt** không có thanh cuộn. Chi tiết chia 12 bước/trang, cài đặt chia 6 lệnh/trang. Thanh tốc độ hỗ trợ mọi mức nguyên từ **1× đến 10×**. Chỉ dùng thông báo nổi của Học Vẹt, có thanh tiến độ khi chạy; không gửi thông báo Windows.
+
+Trong **Công việc riêng**, chọn loại phiên rồi bấm **Mở phiên**. Bấm **Học trong tab**, thao tác trên ảnh xem trước bằng chuột đỏ, nhập tiếng Việt ở ô **Nhập chữ** rồi **Gửi vào phiên**. **Dừng** sẽ tự lưu; chọn **Chạy công việc** để phát lại. Có thể đổi tab, dùng ứng dụng khác hoặc thu Học Vẹt vào khay trong lúc chạy. Phím Dừng học / Khẩn cấp cũng dừng công việc riêng. Các nút của tab đều có thể gán phím trong Cài đặt.
+
+- **Web riêng:** cần Microsoft Edge đã cài. Dùng trình duyệt headless với hồ sơ riêng `%LOCALAPPDATA%\HocVet\web-session`; đăng nhập qua ảnh xem trước nếu cần. Không mở hồ sơ Edge cá nhân. Chuột và phím chỉ gửi vào phiên này. Trang dùng xác thực đặc biệt, tải file hoặc cửa sổ mới chưa được hỗ trợ đầy đủ.
+- **Windows / HIS tương thích:** chọn một cửa sổ đang mở và giữ nguyên kích thước khi chạy. Hỗ trợ ô nhập Edit/RichEdit, một số WinForms và nút Windows chuẩn. Có thể dùng ứng dụng khác nhưng không thu nhỏ cửa sổ đích. Không dùng chuột thật, không đưa cửa sổ đích lên trước. Khi bị chặn, mất cửa sổ, đổi tiến trình, thu nhỏ hoặc không cung cấp ảnh, phiên sẽ dừng/báo lỗi. Thông báo hoàn tất chỉ xác nhận đã gửi thao tác; cần kiểm tra kết quả trên phần mềm đích.
+- **Giới hạn HIS:** chưa bảo đảm với mọi HIS. Điều khiển tùy biến, WPF/GPU, menu chuột phải và hộp thoại ngoài cửa sổ đích có thể không tương thích. Muốn tự động hóa Windows tùy ý và hoàn toàn độc lập cần một phiên Windows / máy ảo riêng; bản này không tạo máy ảo.
+
+Công việc này dùng tọa độ bên trong phiên, **cần học lại trong tab**, không nhập trực tiếp macro tọa độ màn hình. Lưu tại `%LOCALAPPDATA%\HocVet\workspace_scripts.json`, có bản `.bak` khi lưu, được giữ qua cập nhật EXE. **Nhập / Chia sẻ** dùng một file JSON chứa các bước; không chia sẻ thông tin đăng nhập trong hồ sơ trình duyệt. Kịch bản có thể chứa chữ đã nhập nên cần kiểm tra trước khi gửi.
+
+![Công việc riêng](docs/images/workspace.png)
 
 ## Chạy và phát triển từ mã nguồn
 
@@ -71,6 +93,8 @@ Yêu cầu Windows 10 / 11 và Python 3.10 trở lên.
 ```powershell
 git clone https://github.com/UIBreaker/Smart_Operation.git
 cd Smart_Operation
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python main.py
 ```
@@ -79,7 +103,14 @@ Kiểm thử:
 
 ```powershell
 python test_core.py
-python -m unittest -v test_features test_theme
+python -m unittest -v test_features test_theme test_workspace
+```
+
+Kiểm thử tích hợp Edge và cửa sổ Windows mẫu (cần Microsoft Edge):
+
+```powershell
+$env:HOCVET_INTEGRATION = '1'
+python -m unittest -v test_workspace.IntegrationTests
 ```
 
 Đóng gói (cần PyInstaller):

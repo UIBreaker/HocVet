@@ -26,8 +26,14 @@ SHORTCUT_ACTIONS = {
     'details': ('Mở / đóng phần chi tiết các bước', '', 'global'),
     'prev_page': ('Trang bước trước', '', 'global'),
     'next_page': ('Trang bước sau', '', 'global'),
+    **{f'work_{name}': (label, '', 'global') for name, label in (
+        ('open', 'Công việc: mở phiên'), ('learn', 'Công việc: học trong tab'),
+        ('stop', 'Công việc: dừng'), ('run', 'Công việc: chạy'),
+        ('save', 'Công việc: lưu'), ('load', 'Công việc: nhập'),
+        ('export', 'Công việc: chia sẻ'), ('send', 'Công việc: gửi chữ'),
+        ('windows', 'Công việc: làm mới cửa sổ'))},
     **{f'speed_{value}': (f'Tốc độ {value}x', '', 'global')
-       for value in ('0.5', '0.8', '1.0', '1.25', '1.5', '2.0')},
+       for value in tuple(str(i)+'.0' for i in range(1,11))},
     'toggle_movement': ('Bật / tắt bỏ qua di chuột thừa', '', 'global'),
     'toggle_countdown': ('Bật / tắt đếm ngược', '', 'global'),
     'settings': ('Mở cài đặt', '', 'global'),

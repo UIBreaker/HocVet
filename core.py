@@ -447,7 +447,7 @@ class MacroPlayer:
         loop_delay: float,
     ):
         total_steps = len(actions)
-        speed = max(0.1, speed)
+        speed = max(1.0, min(10.0, speed))
         current_loop = 1
         aborted = False
 
@@ -783,6 +783,7 @@ class MacroManager:
         self.on_record_stopped = None
         self.on_panic = None
         self.shortcuts_suspended = False
+        self.external_busy = False
         self.button_hotkey_scopes = {name: 'global' if name in ('show', 'stop_record') else 'app'
                                      for name in self.button_hotkeys if SHORTCUT_ACTIONS[name][2] != 'dialog'}
 
@@ -979,7 +980,7 @@ class MacroManager:
             self.stop_recording()
 
     def _on_hotkey_play_profile(self, profile: ScriptProfile):
-        if self.state == self.STATE_IDLE and profile.enabled and profile.actions:
+        if self.state == self.STATE_IDLE and not self.external_busy and profile.enabled and profile.actions:
             self.set_active_profile(profile.id)
             if self.on_profile_triggered:
                 self.on_profile_triggered(profile)
@@ -989,7 +990,7 @@ class MacroManager:
     # GHI & PHÁT KỊCH BẢN
     # ------------------------------------------
     def start_recording(self, record_movement: bool = False):
-        if self.state not in (self.STATE_IDLE, self.STATE_COUNTDOWN):
+        if self.external_busy or self.state not in (self.STATE_IDLE, self.STATE_COUNTDOWN):
             return
         self.recorder.record_movement = record_movement
         self.recorder.control_hotkeys = [self.hotkey_record_str, self.hotkey_panic_str,
@@ -1016,7 +1017,7 @@ class MacroManager:
         return recorded
 
     def start_playing_profile(self, profile: ScriptProfile):
-        if self.state != self.STATE_IDLE or not profile.actions:
+        if self.external_busy or self.state != self.STATE_IDLE or not profile.actions:
             return
         self._set_state(self.STATE_PLAYING)
         self.player.play_async(

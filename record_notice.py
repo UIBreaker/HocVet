@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 import tkinter as tk
+from tkinter import ttk
 
 from ui_theme import VINTAGE_BG, VINTAGE_TEXT_HEAD, VINTAGE_TEXT_BODY, BTN_RED_TOP, FONT_BODY
 
@@ -12,7 +13,7 @@ class RecordNotice:
         self.window = None
         self.timer = None
 
-    def show(self, title, message, number=None, duration=None):
+    def show(self, title, message, number=None, duration=None, progress=None):
         if self.timer:
             self.root.after_cancel(self.timer)
             self.timer = None
@@ -35,9 +36,15 @@ class RecordNotice:
             self.message = tk.Label(content, bg=VINTAGE_BG, fg=VINTAGE_TEXT_BODY,
                                     font=FONT_BODY, wraplength=290, justify='left', anchor='w')
             self.message.pack(fill='x', pady=(4, 0))
+            self.progress = ttk.Progressbar(content, maximum=100, length=280)
         self.title.configure(text=title)
         self.message.configure(text=message)
         self.number.configure(text=str(number) if number is not None else '●')
+        if progress is None:
+            self.progress.pack_forget()
+        else:
+            self.progress.configure(value=max(0, min(100, progress)))
+            self.progress.pack(fill='x', pady=(8, 0))
         win = self.window
         win.update_idletasks()
         user32 = ctypes.windll.user32

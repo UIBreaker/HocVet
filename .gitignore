@@ -9,4 +9,5 @@ dist/
 .idea/
 *.log
 scripts_library.json
+.venv/
 

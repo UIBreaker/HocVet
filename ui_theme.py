@@ -52,6 +52,10 @@ def apply_theme(root, scale):
     style.theme_use('clam')
     style.configure('.', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_HEAD, font=FONT_BODY)
     style.configure('TFrame', background=VINTAGE_CARD_BG)
+    style.configure('TNotebook',background=VINTAGE_BG,borderwidth=0)
+    style.configure('TNotebook.Tab',font=FONT_BTN,padding=(12,8),background=BTN_BEIGE_TOP)
+    style.map('TNotebook.Tab',background=[('selected',VINTAGE_CARD_BG)],foreground=[('selected',VINTAGE_TEXT_HEAD)])
+    style.configure('Horizontal.TProgressbar',background=BTN_RED_TOP,troughcolor=VINTAGE_INNER_GROOVE)
     style.configure('TLabel', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY)
     style.configure('TCheckbutton', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY,
                     padding=round(4 * scale))

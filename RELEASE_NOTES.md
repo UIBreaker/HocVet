@@ -1,3 +1,22 @@
+# Học Vẹt v0.14.0
+
+- Bốn tab Chính, Chi tiết / sửa bước, Công việc riêng, Cài đặt. Bỏ thanh cuộn ở các tab; danh sách bước và phím tắt chia trang.
+- Tốc độ 1× đến 10×; mỗi mức có thể gán phím.
+- Bỏ thông báo Windows, chỉ dùng thông báo của ứng dụng; thêm thanh tiến độ.
+- Web chạy trong Edge riêng với chuột và bàn phím ảo, tiếp tục khi đổi ứng dụng / thu vào khay. Cần cài Microsoft Edge.
+- Windows / HIS: gửi thao tác nền đến ô nhập và nút chuẩn trong một cửa sổ tương thích, không chiếm chuột thật. Cửa sổ phải giữ nguyên kích thước và không thu nhỏ. Chưa hỗ trợ mọi HIS; điều khiển tùy biến / popup cần phiên Windows hoặc máy ảo riêng.
+- Học, tự lưu, nhập và chia sẻ công việc trong tab bằng JSON; dữ liệu riêng với macro màn hình và được giữ khi cập nhật EXE.
+- Tiết kiệm cập nhật ảnh khi không xem tab; giới hạn tốc độ xem trước và báo tiến độ; dừng có thể ngắt thời gian chờ và hủy lệnh đang đợi.
+- Thêm gán phím cho các nút Công việc, sửa áp dụng lại phím Lưu / Hủy của Cài đặt.
+
+Đã kiểm thử trình duyệt Edge trên trang mẫu cục bộ, nhập tiếng Việt vào cửa sổ Windows chuẩn mà không đổi chuột / tiêu điểm, dừng trong khi chờ, hủy lệnh đang đợi, lưu / nhập và bố cục tab. Chưa xác minh trên phần mềm HIS thực tế hay mọi bộ gõ.
+
+Dữ liệu ở `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi thay ứng dụng. Đóng phiên bản cũ trước khi mở EXE mới.
+
+Gói Windows: `HocVet.exe`, `HocVet-v0.14.0-Windows.zip`, `SHA256SUMS.txt`.
+
+---
+
 # Học Vẹt v0.13.0
 
 - Bố cục mới theo bảng điều khiển mẫu: nền kem, tiêu đề dạng công nghiệp, thanh trượt đỏ và nút nổi vàng / xanh / đỏ. Màn hình chính còn ba bước chọn kịch bản, điều chỉnh, học/chạy; công cụ sửa bước được đưa vào phần Chi tiết.
