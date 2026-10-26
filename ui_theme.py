@@ -66,6 +66,7 @@ def apply_theme(root, scale):
                     arrowcolor=VINTAGE_TEXT_HEAD, padding=round(4 * scale))
     style.map('TCombobox', fieldbackground=[('readonly', '#fffdf8')],
               selectbackground=[('readonly', BTN_BLUE_TOP)], selectforeground=[('readonly', BTN_BLUE_TXT)])
+    style.configure('Profile.TCombobox', padding=(round(8*scale), round(6*scale)))
     for name, top, bottom, text in (
             ('TButton', BTN_BEIGE_TOP, BTN_BEIGE_BOT, BTN_BEIGE_TXT),
             ('Primary.TButton', BTN_GREEN_TOP, BTN_GREEN_BOT, BTN_GREEN_TXT),

@@ -1,3 +1,21 @@
+# Học Vẹt v0.14.1
+
+- Danh sách kịch bản dùng chữ lớn hơn, nền chọn xanh nhạt, phân biệt rõ tên và phím chạy. Hiển thị số bước và số kịch bản đã lưu ngay dưới ô chọn.
+- Thêm nút đỏ **Xóa kịch bản** cạnh nút Tạo mới, dùng chung lệnh và phím tắt Xóa kịch bản. Có xác nhận trước khi xóa; chặn xóa trong lúc học / chạy và giữ lại kịch bản nếu không lưu được thư viện.
+- Giữ quy tắc thư viện luôn có ít nhất một kịch bản; muốn xóa kịch bản cuối cùng, tạo kịch bản mới trước.
+
+## Nâng cấp
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén gói mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này.
+
+## Tải về
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.14.1-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã SHA256 để kiểm tra EXE và ZIP.
+
+---
+
 # Học Vẹt v0.14.0
 
 - Bốn tab Chính, Chi tiết / sửa bước, Công việc riêng, Cài đặt. Bỏ thanh cuộn ở các tab; danh sách bước và phím tắt chia trang.

@@ -311,6 +311,58 @@ class FeaturesTest(unittest.TestCase):
 
 
 class UITest(unittest.TestCase):
+    def test_script_selector_is_readable_and_shows_explicit_hotkey(self):
+        second = ScriptProfile(name='Web auto', hotkey='0', actions=[])
+        self.app.manager.profiles.append(second)
+        self.app._refresh_profile_deck()
+        self.assertIn('Web auto   |   Phím: 0', self.app.profile_choice.cget('values'))
+        self.app._style_profile_dropdown()
+        popup = self.root.tk.call('ttk::combobox::PopdownWindow', self.app.profile_choice)
+        font = self.root.tk.call(f'{popup}.f.l', 'cget', '-font')
+        self.assertEqual(self.root.tk.splitlist(font), ('Segoe UI', '11'))
+        self.app.profile_choice.current(1)
+        self.app._choose_profile()
+        self.assertEqual(self.app.manager.get_active_profile(), second)
+        self.assertIn('0 bước thao tác', self.app.profile_summary.cget('text'))
+        self.assertIn('Phím chạy: 0', self.app.profile_summary.cget('text'))
+        second.actions.append(MacroAction('key_press', 0, key='a'))
+        self.app._refresh_action_tree()
+        self.assertIn('1 bước thao tác', self.app.profile_summary.cget('text'))
+
+    def test_visible_delete_button_cancels_then_deletes_selected_script_and_persists(self):
+        second = ScriptProfile(name='Web auto', hotkey='0')
+        self.app.manager.profiles.append(second)
+        self.app.manager.set_active_profile(second.id)
+        self.app._refresh_profile_deck()
+        self.app.manager.save_library()
+        with patch.object(self.ui.messagebox, 'askyesno', return_value=False):
+            self.app.btn_delete_profile.invoke()
+        self.assertEqual(self.app.manager.get_active_profile(), second)
+        with patch.object(self.ui.messagebox, 'askyesno', return_value=True) as confirm, \
+                patch.object(self.app, 'notify_app'):
+            self.app.btn_delete_profile.invoke()
+        self.assertIn('Web auto', confirm.call_args.args[1])
+        self.assertEqual(self.app.manager.get_active_profile(), self.profile)
+        self.assertEqual(self.app.profile_choice.current(), 0)
+        saved = MacroStorage.load_library(self.app.manager.library_path)[0]
+        self.assertEqual([p.id for p in saved], [self.profile.id])
+
+    def test_delete_failure_keeps_script_and_busy_delete_is_blocked(self):
+        second = ScriptProfile(name='Giữ lại khi lỗi')
+        self.app.manager.profiles.append(second)
+        with patch.object(self.ui.messagebox, 'askyesno', return_value=True), \
+                patch.object(self.app.manager, 'save_library', side_effect=OSError('Disk full')), \
+                patch.object(self.ui.messagebox, 'showerror') as error:
+            self.app._cmd_delete_active_profile()
+        error.assert_called_once()
+        self.assertEqual(self.app.manager.profiles, [self.profile, second])
+        self.assertEqual(self.app.manager.get_active_profile(), self.profile)
+        self.app.manager.external_busy = True
+        with patch.object(self.ui.messagebox, 'askyesno') as confirm, patch.object(self.app, 'notify_app'):
+            self.app._cmd_delete_active_profile()
+        confirm.assert_not_called()
+        self.assertEqual(len(self.app.manager.profiles), 2)
+
     def test_tabs_speed_and_app_only_progress_notification(self):
         from tkinter import ttk
         self.assertEqual(len(self.app.tabs.tabs()), 4)

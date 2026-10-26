@@ -467,11 +467,20 @@ class HocVetApp:
         Retro3DButton(header, text='Thu vào khay', width=105, height=32, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._hide_to_tray).pack(side=tk.RIGHT, padx=8)
         select = self._create_section_card(self.content, '01  CHỌN KỊCH BẢN')
-        self.profile_choice = ttk.Combobox(select, state='readonly', font=FONT_BODY)
+        choice_row = tk.Frame(select, bg=VINTAGE_CARD_BG)
+        choice_row.pack(fill=tk.X)
+        self.profile_choice = ttk.Combobox(choice_row, state='readonly', font=('Segoe UI', 11, 'bold'),
+            height=8, style='Profile.TCombobox', postcommand=self._style_profile_dropdown)
         self.profile_choice.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        self.profile_choice.bind('<<ComboboxSelected>>', lambda event: self._select_profile(self.manager.profiles[self.profile_choice.current()].id))
-        Retro3DButton(select, text='+ Tạo mới', width=100, height=34, top_color=BTN_BEIGE_TOP,
+        self.profile_choice.bind('<<ComboboxSelected>>', self._choose_profile)
+        self.btn_delete_profile = ttk.Button(choice_row, text='Xóa kịch bản', style='Danger.TButton',
+            command=self._cmd_delete_active_profile)
+        self.btn_delete_profile.pack(side=tk.RIGHT, padx=(8, 0))
+        Retro3DButton(choice_row, text='+ Tạo mới', width=100, height=34, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_add_profile).pack(side=tk.RIGHT)
+        self.profile_summary = tk.Label(select, bg=VINTAGE_CARD_BG, fg=VINTAGE_TEXT_BODY,
+            font=FONT_BODY, anchor='w', justify='left')
+        self.profile_summary.pack(fill=tk.X, pady=(6, 0))
         controls = self._create_section_card(self.content, '02  ĐIỀU CHỈNH')
         track = tk.Frame(controls, bg=VINTAGE_CARD_BG)
         track.pack(fill=tk.X)
@@ -875,13 +884,26 @@ class HocVetApp:
     # ==========================================
     def _refresh_profile_deck(self):
         active = self.manager.get_active_profile()
-        self.profile_choice.configure(values=[f'{p.name}  ·  {p.hotkey or "chưa gán phím"}' for p in self.manager.profiles])
+        self.profile_choice.configure(values=[f'{p.name}   |   Phím: {p.hotkey or "chưa gán"}' for p in self.manager.profiles])
         if active:
             self.profile_choice.current(self.manager.profiles.index(active))
         self._load_active_profile_ui()
 
+    def _style_profile_dropdown(self):
+        popdown = self.root.tk.call('ttk::combobox::PopdownWindow', self.profile_choice)
+        self.root.tk.call(f'{popdown}.f.l', 'configure', '-font', ('Segoe UI', 11),
+            '-background', '#fffdf8', '-foreground', VINTAGE_TEXT_HEAD,
+            '-selectbackground', BTN_BLUE_TOP, '-selectforeground', BTN_BLUE_TXT,
+            '-activestyle', 'none', '-borderwidth', 0)
+
+    def _choose_profile(self, event=None):
+        index = self.profile_choice.current()
+        if 0 <= index < len(self.manager.profiles):
+            self._select_profile(self.manager.profiles[index].id)
+
     def _select_profile(self, profile_id: str):
-        if self.manager.state != MacroManager.STATE_IDLE:
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy:
+            self._refresh_profile_deck()
             return
         self.manager.set_active_profile(profile_id)
         self._refresh_profile_deck()
@@ -978,9 +1000,10 @@ class HocVetApp:
             self._cmd_delete_profile(active.id)
 
     def _cmd_delete_profile(self, profile_id: str):
-        if self.manager.state != MacroManager.STATE_IDLE:
+        """Xóa kịch bản sau khi xác nhận, khi ứng dụng đang rảnh."""
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy:
+            self.notify_app('Chưa thể xóa kịch bản', 'Dừng học / chạy trước khi xóa kịch bản.')
             return
-        """Xóa kịch bản với kiểm tra an toàn và thông báo Windows Toast."""
         if len(self.manager.profiles) <= 1:
             messagebox.showwarning(
                 "Không thể xóa",
@@ -1006,7 +1029,12 @@ class HocVetApp:
             return
 
         deleted_name = target.name
-        if self.manager.delete_profile(profile_id):
+        try:
+            deleted = self.manager.delete_profile(profile_id)
+        except OSError as error:
+            messagebox.showerror('Không thể xóa kịch bản', f'Chưa lưu được thư viện. Kịch bản được giữ nguyên.\n{error}', parent=self.root)
+            return
+        if deleted:
             self._refresh_profile_deck()
             self.notify_app(
                 "🗑️ Đã xóa kịch bản",
@@ -1214,6 +1242,9 @@ class HocVetApp:
         )
 
     def _handle_state_ui(self, state: str):
+        idle = state == MacroManager.STATE_IDLE and not self.manager.external_busy
+        self.profile_choice.configure(state='readonly' if idle else 'disabled')
+        self.btn_delete_profile.configure(state='normal' if idle else 'disabled')
         active = self.manager.get_active_profile()
         p_name = active.name if active else "Mặc định"
         p_hk = active.hotkey if active else "F9"
@@ -1349,6 +1380,8 @@ class HocVetApp:
         actions = active.actions if active else []
         total = len(actions)
         total_time = sum(act.delay for act in actions)
+        if active:
+            self.profile_summary.configure(text=f'{total:,} bước thao tác   •   Phím chạy: {active.hotkey or "Chưa gán"}   •   {len(self.manager.profiles)} kịch bản đã lưu')
         self.lbl_stats.configure(text=f"[ THAO TÁC: {total:03d} ]   [ TỔNG THỜI GIAN: {total_time:.2f}s ]")
 
     def _cmd_delete_selected_action(self):

@@ -1,22 +1,20 @@
-# Học Vẹt · v0.14.0
+# Học Vẹt · v0.14.1
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.14.0
+## Có gì mới trong 0.14.1
 
-- Bốn tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt**; danh sách chia trang.
-- **Công việc riêng:** học và chạy trong Edge riêng hoặc cửa sổ Windows / HIS tương thích, không chiếm chuột thật.
-- Tốc độ **1×–10×**, có thể gán phím cho từng mức và các nút Công việc.
-- Thông báo nổi có **thanh tiến độ**, thay thông báo Windows.
-- Tự lưu, nhập và chia sẻ công việc bằng JSON; tiếp tục chạy khi đổi tab hoặc thu vào khay.
+- Danh sách kịch bản chữ lớn, nền chọn xanh nhạt; hiển thị rõ phím chạy, số bước và tổng số kịch bản.
+- Thêm nút đỏ **Xóa kịch bản** cạnh **Tạo mới**, có xác nhận trước khi xóa.
+- Chặn xóa khi đang học / chạy; giữ lại kịch bản nếu lưu thư viện thất bại. Thư viện luôn giữ ít nhất một kịch bản.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.14.0-Windows.zip** tại [bản phát hành 0.14.0](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.14.0). Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+Tải **HocVet.exe** hoặc **HocVet-v0.14.1-Windows.zip** tại [bản phát hành 0.14.1](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.14.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -39,6 +37,14 @@ Tab **Chính** điều chỉnh tốc độ từ **1× đến 10×**. Tab **Chi t
 ![Thông báo tiến độ](docs/images/progress.png)
 
 Các phím trên là mặc định, có thể đổi trong Cài đặt.
+
+## Chọn và xóa kịch bản
+
+Ô chọn kịch bản hiển thị rõ **tên · Phím chạy**, có số bước và tổng số kịch bản bên dưới. Nút đỏ **Xóa kịch bản** nằm cạnh **Tạo mới**, hỏi xác nhận trước khi xóa và chỉ dùng khi đã dừng học / chạy. Thư viện giữ ít nhất một kịch bản; hãy tạo kịch bản mới trước khi xóa kịch bản cuối cùng.
+
+Nếu không lưu được thư viện, ứng dụng báo lỗi và giữ nguyên kịch bản. Nút xóa dùng chung lệnh với phím tắt **Xóa kịch bản** trong Cài đặt.
+
+![Danh sách và nút xóa kịch bản](docs/images/script-selector.png)
 
 ## Cài đặt phím tắt
 

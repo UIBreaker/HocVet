@@ -827,11 +827,17 @@ class MacroManager:
         idx = next((i for i, p in enumerate(self.profiles) if p.id == profile_id), -1)
         if idx == -1:
             return False
-        self.profiles.pop(idx)
+        deleted = self.profiles.pop(idx)
+        previous_active = self.active_profile_id
         if self.active_profile_id == profile_id:
             new_idx = min(idx, len(self.profiles) - 1)
             self.active_profile_id = self.profiles[new_idx].id
-        self.save_library()
+        try:
+            self.save_library()
+        except OSError:
+            self.profiles.insert(idx, deleted)
+            self.active_profile_id = previous_active
+            raise
         self.reload_global_hotkeys()
         return True
 
