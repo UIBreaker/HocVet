@@ -30,6 +30,7 @@ from tkinter import ttk, filedialog
 from PIL import Image, ImageDraw
 from screen_capture import capture_region
 from record_notice import RecordNotice
+from overlay_input import OverlayInput
 from retro_controls import RetroSlider
 from workspace_ui import WorkspacePanel
 from shortcuts import SHORTCUT_ACTIONS, parse_hotkey, tk_sequence, validate_shortcuts
@@ -257,9 +258,10 @@ class HocVetApp:
         self._preview_start = 0
         self._preview_profile = None
         self.record_notice = RecordNotice(root)
+        self._pending_play = None
         self.root._hocvet_app = self
         self._shortcut_commands = {
-            'play': self._cmd_start_playing, 'stop_record': self._cmd_stop_recording,
+            'play': lambda:self._cmd_start_playing(from_hotkey=True), 'stop_record': lambda:self._cmd_stop_recording(from_hotkey=True),
             'add_profile': self._cmd_add_profile, 'edit_profile': self._edit_active_profile,
             'delete_profile': self._cmd_delete_active_profile,
             'copy_script': self._cmd_copy_script, 'paste_script': self._cmd_paste_script,
@@ -288,6 +290,10 @@ class HocVetApp:
         self.manager.on_record_stopped = lambda profile, count: self._post(self._record_saved, profile, count)
         self.manager.recorder.ignore_mouse = self._is_own_window
         self.manager.recorder.ignore_keyboard = self._is_own_focus
+        self.manager.player.protect_mouse = self._is_own_window
+        self.manager.player.protect_keyboard = self._is_own_focus
+        self.overlay_input = OverlayInput()
+        self.manager.player.on_input_finished = self.overlay_input.drain
 
         # Biến cấu hình giao diện
         self.speed_var = tk.StringVar(value="1.0x")
@@ -352,6 +358,9 @@ class HocVetApp:
             self.lbl_stats.configure(text=f'Đang học · {count:,} thao tác · phím dừng: {self.manager.button_hotkeys.get("stop_record") or self.manager.hotkey_record_str}')
             self._rendered_record_count = count
         if hasattr(self, 'workspace'): self.workspace.poll_frame()
+        self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
+        if self.overlay_input.active and self.manager.state != MacroManager.STATE_PLAYING:
+            self.overlay_input.deactivate()
         now = time.monotonic()
         if self._pending_progress and now-self._last_progress_draw >= .1:
             progress, self._pending_progress = self._pending_progress, None
@@ -365,9 +374,10 @@ class HocVetApp:
     def _cleanup_ui(self, event):
         if event.widget is self.root:
             self._closing = True
-            self.record_notice.close()
+            self.overlay_input.close()
+            self.record_notice.close(force=True)
             if hasattr(self, 'workspace'): self.workspace.close()
-            for timer in (getattr(self, '_pump_timer', None), self.countdown_timer):
+            for timer in (getattr(self, '_pump_timer', None), self.countdown_timer, self._pending_play):
                 if timer:
                     try:
                         self.root.after_cancel(timer)
@@ -457,6 +467,8 @@ class HocVetApp:
         for name, method in (('open', 'open'), ('learn', 'learn'), ('stop', 'stop'), ('run', 'run'),
                 ('save', 'save'), ('load', 'load'), ('export', 'export'), ('send', '_send_text'), ('windows', '_windows')):
             self._shortcut_commands[f'work_{name}'] = getattr(self.workspace, method)
+        self._shortcut_commands['work_learn'] = lambda:self.workspace.learn(from_hotkey=True)
+        self._shortcut_commands['work_run'] = lambda:self.workspace.run(from_hotkey=True)
         header = tk.Frame(self.content, bg=VINTAGE_BG, padx=20, pady=12)
         header.pack(fill=tk.X)
         tk.Label(header, text='HỌC VẸT', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
@@ -601,14 +613,14 @@ class HocVetApp:
             self._post(self._show_from_tray)
 
         def _action_panic(icon, item):
-            self._post(self._cmd_emergency_stop)
+            if self.manager.script_activation=='mouse': self._post(self._cmd_emergency_stop)
 
         def _action_exit(icon, item):
             self._post(self._exit_app)
 
         tray_menu = pystray.Menu(
             pystray.MenuItem("📌 Mở giao diện chính", _action_open, default=True),
-            pystray.MenuItem("🛑 Dừng khẩn cấp (ESC)", _action_panic),
+            pystray.MenuItem("🛑 Dừng công việc", _action_panic, enabled=lambda item:self.manager.script_activation=='mouse'),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("❌ Thoát ứng dụng", _action_exit),
         )
@@ -626,13 +638,16 @@ class HocVetApp:
         """Ẩn cửa sổ xuống khay hệ thống."""
         self.root.withdraw()
         self.workspace.set_visible(False)
-        self.notify_app(
-            f"{APP_NAME} (v{APP_VERSION})",
-            "Ứng dụng đã thu nhỏ xuống khay hệ thống! Phím tắt kích hoạt vẫn hoạt động bình thường trong nền."
-        )
+        self.record_notice.pin(self.manager.profiles, self._run_from_panel, self._cmd_emergency_stop,
+            self._show_from_tray, self.manager.script_activation)
+        self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
 
     def _show_from_tray(self):
         """Khôi phục cửa sổ từ khay hệ thống."""
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None:
+            self.notify_app('Công việc đang chạy', 'Bấm Dừng trước khi mở giao diện chính.')
+            return
+        self.record_notice.close(force=True)
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
@@ -648,7 +663,12 @@ class HocVetApp:
     def _exit_app(self):
         """Thoát hoàn toàn ứng dụng."""
         self._closing = True
-        self.record_notice.close()
+        self.manager.stop_playing()
+        self.record_notice.close(force=True)
+        self.overlay_input.close()
+        if self._pending_play:
+            self.root.after_cancel(self._pending_play)
+            self._pending_play = None
         self.workspace.close()
         self.manager.stop_global_hotkeys()
         self.manager.stop_playing()
@@ -668,6 +688,10 @@ class HocVetApp:
         for sequence, binding in getattr(self, '_settings_bindings', []):
             self.root.unbind(sequence, binding)
         self._settings_bindings = []
+        for sequence, binding in self._shortcut_bindings:
+            self.root.unbind(sequence, binding)
+        self._shortcut_bindings.clear()
+        if self.manager.script_activation == 'mouse': return
         for name, callback in getattr(self, '_settings_commands', {}).items():
             key = self.manager.button_hotkeys.get(name, '')
             if key:
@@ -677,9 +701,6 @@ class HocVetApp:
                         return 'break'
                 sequence = tk_sequence(key)
                 self._settings_bindings.append((sequence, self.root.bind(sequence, invoke_settings, add='+')))
-        for sequence, binding in self._shortcut_bindings:
-            self.root.unbind(sequence, binding)
-        self._shortcut_bindings.clear()
         for name, text in self.manager.button_hotkeys.items():
             if text and self.manager.button_hotkey_scopes.get(name) == 'app':
                 sequence = tk_sequence(text)
@@ -700,11 +721,14 @@ class HocVetApp:
                     self._shortcut_bindings.append((variant, binding))
 
     def _dispatch_shortcut(self, name):
+        if self._pending_play is not None: return
+        if self.manager.script_activation == 'mouse':
+            return
         if name == 'stop_record' and self.manager.external_busy:
             self.workspace.stop(); return
         if self.manager.external_busy and name not in ('show', 'hide', 'help', 'work_stop'): return
         if name == 'stop_record' and self.manager.state in (MacroManager.STATE_RECORDING, MacroManager.STATE_COUNTDOWN):
-            self._cmd_stop_recording()
+            self._cmd_stop_recording(from_hotkey=True)
             return
         if self.root.grab_current() is not None or any(win.winfo_exists() for win in self._shortcut_dialogs):
             return
@@ -726,7 +750,7 @@ class HocVetApp:
             self.manager.shortcuts_suspended = True
             self.manager.stop_global_hotkeys()
         for name, callback in commands.items():
-            text = self.manager.button_hotkeys.get(name, '')
+            text = self.manager.button_hotkeys.get(name, '') if self.manager.script_activation=='hotkey' else ''
             if text:
                 def invoke(event, command=callback):
                     command()
@@ -765,7 +789,7 @@ class HocVetApp:
         panel = win.body
         ttk.Label(panel, text='Cài đặt phím tắt', font=('Bahnschrift',17)).pack(anchor='w',pady=(0,8))
         ttk.Label(panel, text='Gõ tên phím (F6, Ctrl+Shift+K) hoặc bấm Ghi phím rồi nhấn tổ hợp.', wraplength=650).pack(anchor='w')
-        ttk.Label(panel, text='Học, Dừng học và Khẩn cấp dùng được cả khi chạy nền. Các lệnh khác có thể chọn phạm vi; để trống để bỏ gán (trừ Học và Khẩn cấp).', wraplength=650).pack(anchor='w', pady=(4, 8))
+        ttk.Label(panel, text='Ở chế độ phím, các lệnh hoạt động theo phạm vi đã chọn. Chế độ chuột vô hiệu hóa toàn bộ phím đã gán, kể cả Dừng khẩn cấp.', wraplength=650).pack(anchor='w', pady=(4, 8))
         rows = ttk.Frame(panel)
         rows.pack(fill=tk.BOTH, expand=True)
         self._settings_widgets = []
@@ -832,11 +856,19 @@ class HocVetApp:
         self._show_settings_page(0)
         tray_var = tk.BooleanVar(value=self.manager.minimize_to_tray_on_close)
         ttk.Checkbutton(panel, text='Thu nhỏ xuống khay khi bấm đóng [X]', variable=tray_var).pack(anchor='w')
+        activation = self.activation_var = tk.StringVar(value=self.manager.script_activation)
+        modes = ttk.Frame(panel)
+        modes.pack(fill='x', pady=(6, 0))
+        ttk.Label(modes, text='Kích hoạt kịch bản:').pack(side='left', padx=(0,8))
+        ttk.Radiobutton(modes, text='Bấm chuột ở bảng nổi', value='mouse', variable=activation).pack(side='left')
+        ttk.Radiobutton(modes, text='Dùng phím đã gán', value='hotkey', variable=activation).pack(side='left', padx=8)
+        ttk.Label(panel, text='Dùng chuột: tắt mọi phím đã gán. Dùng phím: khóa nút Học / Chạy / Dừng bằng chuột.',
+            wraplength=650).pack(anchor='w', pady=(4,0))
         def save():
             values = {name: value.get().strip() for name, value in variables.items()}
             previous = (self.manager.hotkey_record_str, self.manager.hotkey_panic_str,
                         dict(self.manager.button_hotkeys), dict(self.manager.button_hotkey_scopes),
-                        self.manager.minimize_to_tray_on_close)
+                        self.manager.minimize_to_tray_on_close, self.manager.script_activation)
             try:
                 if self.manager.state != MacroManager.STATE_IDLE:
                     raise ValueError('Hãy dừng ghi / chạy trước khi lưu cài đặt.')
@@ -851,11 +883,14 @@ class HocVetApp:
                             raise ValueError(f'{SHORTCUT_ACTIONS[name][0]}: phím này chưa được hỗ trợ trong cửa sổ ứng dụng.') from error
                 self.manager.apply_shortcuts(values, {name: 'global' if value.get() == 'Toàn cục' else 'app' for name, value in scopes.items()})
                 self.manager.minimize_to_tray_on_close = tray_var.get()
+                if activation.get() not in ('mouse', 'hotkey'):
+                    raise ValueError('Chọn cách kích hoạt kịch bản hợp lệ.')
+                self.manager.script_activation = activation.get()
                 self.manager.save_library()
             except (ValueError, OSError) as error:
                 (self.manager.hotkey_record_str, self.manager.hotkey_panic_str,
                  self.manager.button_hotkeys, self.manager.button_hotkey_scopes,
-                 self.manager.minimize_to_tray_on_close) = previous
+                 self.manager.minimize_to_tray_on_close, self.manager.script_activation) = previous
                 messagebox.showerror('Không thể lưu phím tắt', str(error), parent=win)
                 return
             self._install_shortcuts()
@@ -884,6 +919,7 @@ class HocVetApp:
     # ==========================================
     def _refresh_profile_deck(self):
         active = self.manager.get_active_profile()
+        self.record_notice.update_profiles(self.manager.profiles)
         self.profile_choice.configure(values=[f'{p.name}   |   Phím: {p.hotkey or "chưa gán"}' for p in self.manager.profiles])
         if active:
             self.profile_choice.current(self.manager.profiles.index(active))
@@ -921,6 +957,12 @@ class HocVetApp:
         self.btn_stop.set_text(f"DỪNG · {self.manager.button_hotkeys.get('stop_record') or self.manager.hotkey_record_str}")
         self.btn_panic.set_text(f'DỪNG KHẨN CẤP · {self.manager.hotkey_panic_str}')
         self.workflow_hint.set(f'{self.manager.hotkey_record_str} → đợi 3 giây → thao tác → [{self.manager.button_hotkeys.get("stop_record") or self.manager.hotkey_record_str}] dừng')
+        if self.manager.script_activation == 'mouse':
+            self.btn_play.set_text('CHẠY · THU VÀO KHAY')
+            self.btn_rec.set_text('HỌC THAO TÁC')
+            self.btn_stop.set_text('DỪNG HỌC')
+            self.btn_panic.set_text('DỪNG KHẨN CẤP')
+            self.workflow_hint.set('Bấm Học → đợi 3 giây → thao tác → bấm Dừng ở bảng nổi')
         active.speed=max(1.,min(10.,active.speed))
         self.speed_var.set(f"{active.speed:g}x")
         self.speed_slider.set(active.speed)
@@ -933,6 +975,8 @@ class HocVetApp:
 
     def _idle_status(self):
         active = self.manager.get_active_profile()
+        if self.manager.script_activation == 'mouse':
+            return f'SẴN SÀNG · {active.name if active else "Chọn kịch bản"} · Chỉ dùng chuột · Phím đã gán đang tắt'
         name = active.name if active else 'Chọn kịch bản'
         stop = self.manager.button_hotkeys.get('stop_record') or self.manager.hotkey_record_str
         return f'SẴN SÀNG · {name} · HỌC [{self.manager.hotkey_record_str}] · DỪNG HỌC [{stop}]'
@@ -1139,14 +1183,18 @@ class HocVetApp:
         if self.manager.external_busy:
             self.notify_app('Công việc riêng đang chạy', 'Dừng công việc trước khi học màn hình.'); return
         if self.manager.state in (MacroManager.STATE_RECORDING, MacroManager.STATE_COUNTDOWN):
-            self._cmd_stop_recording()
+            self._cmd_stop_recording(from_hotkey=True)
         elif self.manager.state == MacroManager.STATE_IDLE and not self._shortcut_dialogs:
-            self._cmd_start_recording(force_countdown=True)
+            self._cmd_start_recording(force_countdown=True, from_hotkey=True)
 
-    def _cmd_start_recording(self, force_countdown=False):
+    def _cmd_start_recording(self, force_countdown=False, from_hotkey=False):
+        if (self.manager.script_activation == 'hotkey') != from_hotkey: return
+        if self._pending_play is not None: return
         if self.manager.external_busy: return
         if self.manager.state != MacroManager.STATE_IDLE or self.countdown_timer:
             return
+        if self.manager.script_activation == 'mouse':
+            self._hide_to_tray()
         if force_countdown or self.countdown_var.get():
             self.manager._set_state(MacroManager.STATE_COUNTDOWN)
             self._start_countdown(3)
@@ -1159,7 +1207,8 @@ class HocVetApp:
             return
         if seconds_left > 0:
             self._set_hud(f'Bắt đầu học sau {seconds_left} giây · nhấn phím dừng để hủy', BTN_RED_BOT)
-            self.record_notice.show('Sắp bắt đầu học thao tác', 'Chuyển sang phần mềm cần thao tác. Phím dừng có thể hủy đếm ngược.', number=seconds_left)
+            self.record_notice.show('Sắp bắt đầu học thao tác', 'Chuyển sang phần mềm cần thao tác. Bấm Dừng để hủy.' if self.manager.script_activation == 'mouse'
+                else 'Chuyển sang phần mềm cần thao tác. Phím dừng có thể hủy đếm ngược.', number=seconds_left)
             self.countdown_timer = self.root.after(1000, lambda: self._start_countdown(seconds_left-1))
         else:
             self._do_start_record()
@@ -1174,7 +1223,8 @@ class HocVetApp:
         active = self.manager.get_active_profile()
         stop = self.manager.button_hotkeys.get('stop_record') or self.manager.hotkey_record_str
         name = active.name if active else 'Kịch bản'
-        self.record_notice.show('ĐANG HỌC THAO TÁC', f'{name} · Nhấn [{stop}] để dừng và lưu.', duration=3500)
+        instruction = 'Bấm Dừng ở bảng nổi để lưu.' if self.manager.script_activation == 'mouse' else f'Nhấn [{stop}] để dừng và lưu.'
+        self.record_notice.show('ĐANG HỌC THAO TÁC', f'{name} · {instruction}', duration=3500)
 
     def _cancel_countdown(self):
         if self.countdown_timer:
@@ -1186,7 +1236,8 @@ class HocVetApp:
             return True
         return False
 
-    def _cmd_stop_recording(self):
+    def _cmd_stop_recording(self, from_hotkey=False):
+        if (self.manager.script_activation == 'hotkey') != from_hotkey: return
         if self._cancel_countdown():
             return
         if self.manager.state != MacroManager.STATE_RECORDING:
@@ -1198,7 +1249,9 @@ class HocVetApp:
         self._refresh_profile_deck()
         self.record_notice.show('ĐÃ DỪNG & LƯU THÀNH CÔNG', f'{name} · {count:,} thao tác. Nút / phím dừng không được ghi.', duration=4500)
 
-    def _cmd_start_playing(self):
+    def _cmd_start_playing(self, from_hotkey=False):
+        if (self.manager.script_activation == 'hotkey') != from_hotkey: return
+        if self._pending_play is not None: return
         if self.manager.external_busy:
             self.notify_app('Công việc riêng đang chạy', 'Không chạy đồng thời chuột màn hình.'); return
         if self.manager.state != MacroManager.STATE_IDLE:
@@ -1210,17 +1263,45 @@ class HocVetApp:
         active.speed = self._parse_speed()
         active.loop_count = self._parse_loop_count()
         active.loop_delay = self._parse_loop_delay()
-        self.manager.start_playing_profile(active)
+        self._hide_to_tray()
+        self.record_notice.set_busy(True)
+        self.notify_app('Đang chuẩn bị chạy', f'{active.name} · Đã thu vào khay.', progress=0)
+        def start():
+            self._pending_play = None
+            if self._closing or self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy: return
+            win = self.record_notice.window
+            stop = self.record_notice.stop_button
+            win.update_idletasks()
+            bounds = (win.winfo_rootx(),win.winfo_rooty(),win.winfo_rootx()+win.winfo_width(),win.winfo_rooty()+win.winfo_height())
+            stop_bounds = (stop.winfo_rootx(),stop.winfo_rooty(),stop.winfo_rootx()+stop.winfo_width(),stop.winfo_rooty()+stop.winfo_height())
+            try:
+                self.overlay_input.activate(self.record_notice.hwnd, bounds, stop_bounds,
+                    lambda:self._post(self._cmd_emergency_stop), self.manager.script_activation=='mouse')
+            except Exception as error:
+                self.notify_app('Chưa thể chạy', str(error))
+                return
+            self.manager.start_playing_profile(active)
+            instruction = 'Bấm Dừng để kết thúc.' if self.manager.script_activation=='mouse' else f'Nhấn [{self.manager.hotkey_panic_str}] để dừng.'
+            self.notify_app('Đang chạy kịch bản', f'{active.name} · {instruction}', progress=0)
+        self._pending_play = self.root.after(200, start)
 
-        # THÔNG BÁO WINDOWS KHI BẮT ĐẦU CHẠY
-        self.notify_app(
-            "▶ Bắt đầu chạy kịch bản",
-            f"Đang tự động thực hiện '{active.name}' ({len(active.actions)} bước)... Nhấn [{self.manager.hotkey_panic_str}] để dừng khẩn cấp."
-        )
+    def _run_from_panel(self, profile_id, from_hotkey=False):
+        if (self.manager.script_activation == 'hotkey') != from_hotkey: return
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
+        profile = next((p for p in self.manager.profiles if p.id == profile_id), None)
+        if not profile or not profile.enabled or not profile.actions: return
+        self._select_profile(profile.id)
+        self._cmd_start_playing(from_hotkey=from_hotkey)
 
     def _cmd_emergency_stop(self):
+        if self._pending_play is not None:
+            self.root.after_cancel(self._pending_play)
+            self._pending_play = None
         self.workspace.stop()
         if self._cancel_countdown():
+            return
+        if self.manager.state == MacroManager.STATE_RECORDING:
+            self._cmd_stop_recording(from_hotkey=self.manager.script_activation=='hotkey')
             return
         self.manager.stop_playing()
         self.notify_app('Đã dừng thao tác', 'Mọi thao tác tự động đã được dừng.')
@@ -1234,12 +1315,7 @@ class HocVetApp:
 
     def _on_profile_triggered(self, profile: ScriptProfile):
         """Được gọi khi người dùng bấm phím tắt của một kịch bản từ bất kỳ đâu."""
-        self._post(self._refresh_profile_deck)
-        # THÔNG BÁO WINDOWS KHI CHẠY TỪ PHÍM TẮT TOÀN CỤC
-        self.notify_app(
-            f"▶ Kích hoạt '{profile.name}'",
-            f"Đang tự động thực hiện kịch bản [{profile.hotkey}]..."
-        )
+        self._post(self._run_from_panel, profile.id, True)
 
     def _handle_state_ui(self, state: str):
         idle = state == MacroManager.STATE_IDLE and not self.manager.external_busy
@@ -1268,6 +1344,7 @@ class HocVetApp:
             self.btn_stop.configure_state('normal')
         elif state == MacroManager.STATE_RECORDING:
             self._set_hud(
+                f'ĐANG HỌC · {p_name} · Bấm Dừng ở bảng nổi để lưu' if self.manager.script_activation=='mouse' else
                 f"ĐANG HỌC · {p_name} · Nhấn [{self.manager.button_hotkeys.get('stop_record') or self.manager.hotkey_record_str}] để dừng và lưu",
                 fg=BTN_RED_BOT,
             )
@@ -1283,6 +1360,10 @@ class HocVetApp:
             self.btn_rec.configure_state("disabled")
             self.btn_stop.configure_state("disabled")
             self.btn_play.configure_state("disabled")
+        if self.manager.script_activation == 'hotkey':
+            for button in (self.btn_rec,self.btn_play,self.btn_stop,self.btn_panic):
+                button.configure_state('disabled')
+        self.workspace.set_activation_mode(self.manager.script_activation)
 
     def _on_action_recorded(self, action: MacroAction, count: int):
         self._recorded_count = count
@@ -1306,7 +1387,10 @@ class HocVetApp:
         if self.manager.player.last_error:
             error = self.manager.player.last_error
             self.root.after(0, lambda: self._set_hud(f'LỖI: {error}', BTN_RED_BOT))
-            self.root.after(0, lambda: messagebox.showerror('Kịch bản đã dừng', error, parent=self.root))
+            if self.record_notice.pinned:
+                self.notify_app('Kịch bản đã dừng', error)
+            else:
+                self.root.after(0, lambda: messagebox.showerror('Kịch bản đã dừng', error, parent=self.root))
             return
         if aborted:
             msg = f"ĐÃ DỪNG KHẨN CẤP '{p_name}' THEO LỆNH ({self.manager.hotkey_panic_str})"
@@ -1316,7 +1400,7 @@ class HocVetApp:
             msg = f"HOÀN TẤT KỊCH BẢN '{p_name}' THÀNH CÔNG!"
             self.root.after(0, lambda: self._set_hud(f"⭐ {msg}", fg=BTN_GREEN_TXT))
             # THÔNG BÁO WINDOWS KHI HOÀN TẤT CHẠY
-            self.notify_app("⭐ Hoàn thành xuất sắc", f"Đã thực hiện xong toàn bộ kịch bản '{p_name}'!")
+            self.notify_app("Đã hoàn tất kịch bản", f"{p_name} · Chọn kịch bản tiếp theo bên dưới.", progress=100)
 
     # ==========================================
     # QUẢN LÝ BẢNG KỊCH BẢN (TREEVIEW)
@@ -1505,6 +1589,8 @@ class HocVetApp:
         text.pack(fill=tk.BOTH, expand=True)
         text.insert('1.0', f"""HỌC VẸT — HƯỚNG DẪN
 
+Mặc định dùng chuột: toàn bộ phím đã gán đều tắt, kể cả Dừng khẩn cấp. Bấm Học trên màn hình chính, Dừng ở bảng nổi để lưu. Chọn Cài đặt → Dùng phím đã gán để dùng bàn phím; khi đó các nút Học / Chạy / Dừng bằng chuột bị khóa.
+
 1. Tạo / chọn kịch bản. Nhấn {self.manager.hotkey_record_str}, chờ thông báo đếm ngược 3–2–1 và ĐANG HỌC rồi thực hiện thao tác. Nhấn lại hoặc phím Dừng học đã gán để lưu; thông báo xác nhận xuất hiện cả khi chạy nền. Nhấn {self.manager.hotkey_panic_str} để dừng khẩn cấp.
 2. Chọn CHẠY hoặc dùng phím tắt của kịch bản. Thanh trạng thái luôn hiện ở cuối cửa sổ: ĐANG GHI, ĐANG CHẠY, ĐANG CHỜ hoặc lỗi.
 3. Mở Chi tiết / sửa bước rồi chọn một bước trong bảng, bấm + Chờ cửa sổ hoặc + Chờ ảnh / nút để chèn điều kiện TRƯỚC bước đó. Không chọn dòng sẽ thêm ở cuối. Sửa điều kiện để đổi thời hạn / ảnh. Hết hạn thì kịch bản dừng, không bấm tiếp.
@@ -1519,6 +1605,8 @@ Cập nhật / thay file ứng dụng không xóa thư viện. File .bak giữ l
 10. Công việc riêng: chọn Web hoặc cửa sổ Windows / HIS, rồi Mở phiên. Nhấn Học trong tab và thao tác trên ảnh xem trước bằng chuột đỏ; gửi tiếng Việt qua ô Nhập chữ. Dừng để tự lưu, sau đó Chạy công việc. Có thể đổi tab, thu Học Vẹt vào khay hoặc dùng ứng dụng khác. Công việc trong tab được lưu / chia sẻ riêng với kịch bản màn hình.
 11. Web cần Microsoft Edge; trình duyệt dùng hồ sơ riêng. Windows chỉ hỗ trợ ô nhập Edit/RichEdit và nút chuẩn trong một cửa sổ tương thích, không thu nhỏ cửa sổ đích. HIS dùng điều khiển tùy biến, popup hoặc không cung cấp ảnh cần phiên Windows / máy ảo riêng để chạy độc lập hoàn toàn. Chế độ này không chuyển sang điều khiển chuột thật.
 12. Dùng Tab, Enter / Space để thao tác. Vào Cài đặt để gán phím cho các nút, kể cả công việc riêng; chọn Trong ứng dụng / Toàn cục. Phím Dừng học hoặc Dừng khẩn cấp cũng dừng công việc riêng.
+13. Bấm Chạy sẽ thu vào khay trước rồi bắt đầu. Bảng nổi luôn có tiến trình và kịch bản bên dưới; bấm Chạy từng dòng, Trước / Sau hoặc lăn chuột để chuyển trang. Dừng vẫn dùng được khi đang chạy; nút Mở ứng dụng dùng sau khi đã dừng.
+14. Kéo tiêu đề bảng khi rảnh để đổi vị trí. Khi phát, chuột của kịch bản xuyên qua bảng tới cửa sổ bên dưới, không làm dừng kịch bản hoặc bấm các nút trên bảng. Ở chế độ chuột, chỉ cú bấm chuột thật vào Dừng mới dừng; ở chế độ phím dùng phím Dừng đã gán. Sau khi phát xong bảng nhận chuột trở lại.
 
 Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; kiểm tra nội dung trước khi chia sẻ.
 """)

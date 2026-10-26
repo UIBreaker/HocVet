@@ -52,9 +52,13 @@ class WorkspacePanel:
         self.info.pack(fill='x', padx=14, pady=6)
         controls = ttk.Frame(parent, padding=(12, 4))
         controls.pack(fill='x')
+        self.activation_buttons = []
         for label, command in (('Học trong tab', self.learn), ('Dừng', self.stop), ('Chạy công việc', self.run),
                                ('Lưu', self.save), ('Nhập', self.load), ('Chia sẻ', self.export)):
-            ttk.Button(controls, text=label, command=command).pack(side='left', padx=(0, 5))
+            if label == 'Dừng': command = lambda:self.stop() if self.app.manager.script_activation=='mouse' else None
+            button = ttk.Button(controls, text=label, command=command)
+            button.pack(side='left', padx=(0, 5))
+            if label in ('Học trong tab','Dừng','Chạy công việc'): self.activation_buttons.append(button)
         saved = ttk.Frame(parent, padding=(12, 4))
         saved.pack(fill='x')
         ttk.Label(saved, text='Công việc:').pack(side='left')
@@ -175,7 +179,12 @@ class WorkspacePanel:
             self._input({'kind':'text','text':self.text.get()})
             self.text.set('')
 
-    def learn(self):
+    def set_activation_mode(self, mode):
+        for button in self.activation_buttons:
+            button.configure(state='normal' if mode=='mouse' else 'disabled')
+
+    def learn(self, from_hotkey=False):
+        if (self.app.manager.script_activation=='hotkey') != from_hotkey: return
         if not self._available() or not self.engine or not self.engine.ready:
             self.app.notify_app('Mở phiên trước', 'Mở Web hoặc chọn cửa sổ Windows, sau đó bấm Học trong tab.')
             return
@@ -192,7 +201,8 @@ class WorkspacePanel:
         if was_recording:
             self.status.configure(text='Đang kết thúc lượt học và giữ các thao tác đã nhận…')
 
-    def run(self):
+    def run(self, from_hotkey=False):
+        if (self.app.manager.script_activation=='hotkey') != from_hotkey: return
         if not self._available(): return
         if not self.engine or not self.engine.ready or self._needs_open or self.job_mode != self.engine.mode or self.mode.get()!=self.engine.mode:
             self.app.notify_app('Chọn đúng phiên', 'Mở phiên cùng loại với công việc trước khi chạy. Kịch bản màn hình không dùng trực tiếp trong tab.')
@@ -201,6 +211,7 @@ class WorkspacePanel:
             self.app.notify_app('Chưa có công việc', 'Bấm Học trong tab hoặc nhập file công việc đã học trong tab.')
             return
         self.app.manager.external_busy = True
+        self.app._hide_to_tray()
         self.engine.submit('run', (list(self.actions), self.app._parse_speed(), self.job_size))
         self.app.notify_app('Đang chạy công việc riêng', 'Bạn có thể đổi tab hoặc làm việc ở màn hình khác.', progress=0)
 

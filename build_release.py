@@ -40,7 +40,7 @@ if __name__ == '__main__':
     project = Path(__file__).resolve().parent
     for command in (
             [sys.executable, '-X', 'utf8', 'test_core.py'],
-            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_features', 'test_theme', 'test_workspace'],
+            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_features', 'test_theme', 'test_workspace', 'test_overlay_input'],
             [sys.executable, '-m', 'PyInstaller', '--noconfirm', 'HocVet.spec']):
         subprocess.run(command, cwd=project, check=True)
     for artifact in package_release(project):

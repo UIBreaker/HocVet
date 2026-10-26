@@ -13,6 +13,27 @@ from ui_theme import apply_theme, create_dialog, ThemedInputs, ThemedMessages, V
 
 
 class ThemeTests(unittest.TestCase):
+    def test_pinned_panel_pages_scripts_keeps_progress_and_disables_runs_when_busy(self):
+        from record_notice import RecordNotice
+        from core import ScriptProfile, MacroAction
+        from unittest.mock import Mock
+        profiles=[ScriptProfile(name=f'Công việc số {i}', actions=[MacroAction('key_press',0,key='a')]) for i in range(17)]
+        notice=RecordNotice(self.root);self.addCleanup(lambda:notice.close(force=True))
+        run=Mock()
+        notice.pin(profiles,run,Mock(),Mock())
+        self.root.update()
+        notice._page(1)
+        notice.run_buttons[0].invoke()
+        run.assert_called_once_with(profiles[3].id)
+        notice.show('Đang chạy','6/10 bước',progress=60,duration=10)
+        self.assertIsNone(notice.timer)
+        self.assertEqual(notice.progress.cget('value'),60)
+        self.assertLess(notice.progress.winfo_rooty(), notice.launcher.winfo_rooty())
+        notice.set_busy(True)
+        self.assertTrue(all('disabled' in button.state() for button in notice.run_buttons))
+        notice.close()
+        self.assertTrue(notice.window.winfo_exists())
+
     def setUp(self):
         self.root = tk.Tk()
         self.root.withdraw()

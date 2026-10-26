@@ -22,6 +22,47 @@ def reference_png():
 
 
 class FeaturesTest(unittest.TestCase):
+    def test_mouse_activation_disables_start_stop_hotkeys_and_persists(self):
+        path = str(self.folder / 'activation.json')
+        manager = MacroManager(path)
+        manager.button_hotkeys.update(play='F6', stop_record='2')
+        manager.button_hotkey_scopes['play'] = 'global'
+        manager.on_record_toggle = Mock()
+        manager.on_command = Mock()
+        manager.on_panic = Mock()
+        with patch('core.keyboard.GlobalHotKeys') as listener:
+            manager.start_global_hotkeys()
+            listener.assert_not_called()
+        manager._on_hotkey_toggle_record()
+        manager._on_command_hotkey('stop_record')
+        manager._on_hotkey_panic()
+        manager.on_record_toggle.assert_not_called()
+        manager.on_command.assert_not_called()
+        manager.on_panic.assert_not_called()
+        manager.save_library()
+        self.assertEqual(MacroManager(path).script_activation, 'mouse')
+        manager.script_activation = 'hotkey'
+        manager.save_library()
+        restored = MacroManager(path)
+        self.assertEqual(restored.script_activation, 'hotkey')
+        with patch('core.keyboard.GlobalHotKeys') as listener:
+            restored.start_global_hotkeys()
+            self.assertIn('<f9>', listener.call_args.args[0])
+            self.assertIn('2', listener.call_args.args[0])
+
+    def test_playback_does_not_inject_input_into_own_panel(self):
+        player = self.player()
+        player.protect_mouse = Mock(return_value=True)
+        for kind in ('mouse_click', 'mouse_move', 'mouse_scroll'):
+            with self.assertRaises(RuntimeError):
+                player._execute_action(MacroAction(kind, 0, x=12, y=34, pressed=True))
+        player.mouse_controller.press.assert_not_called()
+        player.mouse_controller.scroll.assert_not_called()
+        player.protect_keyboard = Mock(return_value=True)
+        with self.assertRaises(RuntimeError):
+            player._execute_action(MacroAction('key_press', 0, key='a'))
+        player.keyboard_controller.press.assert_not_called()
+
     def setUp(self):
         parent = Path(__file__).parent / 'build' / 'test-features'
         parent.mkdir(parents=True, exist_ok=True)
@@ -218,6 +259,7 @@ class FeaturesTest(unittest.TestCase):
 
     def test_global_commands_use_saved_scope_and_ignore_injected_keys(self):
         manager = MacroManager(str(self.folder / 'library.json'))
+        manager.script_activation = 'hotkey'
         manager.button_hotkeys.update(wait_image='F6', wait_window='F7')
         manager.button_hotkey_scopes.update(wait_image='global', wait_window='app')
         manager.on_command = Mock()
@@ -263,6 +305,7 @@ class FeaturesTest(unittest.TestCase):
         MacroStorage.save_library([self.profile()], path,
             {'button_hotkeys': {'stop_record': '2'}, 'button_hotkey_scopes': {'stop_record': 'app'}})
         manager = MacroManager(path)
+        manager.script_activation = 'hotkey'
         self.assertEqual(manager.button_hotkey_scopes['stop_record'], 'global')
         with patch('core.keyboard.GlobalHotKeys') as listener:
             manager.start_global_hotkeys()
@@ -270,6 +313,7 @@ class FeaturesTest(unittest.TestCase):
 
     def test_new_profile_play_hotkey_works_after_learning_without_hook_restart(self):
         manager = MacroManager(str(self.folder / 'library.json'))
+        manager.script_activation = 'hotkey'
         profile = ScriptProfile(name='Mới tạo', hotkey='F9', actions=[])
         manager.profiles = [profile]
         with patch('core.keyboard.GlobalHotKeys') as listener, patch.object(manager, 'start_playing_profile') as play:
@@ -311,6 +355,89 @@ class FeaturesTest(unittest.TestCase):
 
 
 class UITest(unittest.TestCase):
+    def test_keyboard_mode_disables_mouse_activation_and_mouse_mode_unbinds_all_hotkeys(self):
+        self.app._handle_state_ui(MacroManager.STATE_IDLE)
+        for button in (self.app.btn_rec,self.app.btn_play,self.app.btn_stop,self.app.btn_panic):
+            self.assertEqual(button.state,'disabled')
+        self.assertTrue(all('disabled' in b.state() for b in self.app.workspace.activation_buttons))
+        self.app._cmd_start_playing()
+        self.app._cmd_start_recording()
+        self.app._run_from_panel(self.profile.id)
+        self.assertIsNone(self.app._pending_play)
+        self.assertEqual(self.app.manager.state,MacroManager.STATE_IDLE)
+        self.app._hide_to_tray()
+        self.assertTrue(all('disabled' in b.state() for b in self.app.record_notice.run_buttons))
+        self.app.manager.script_activation='mouse'
+        self.app._install_shortcuts()
+        self.assertEqual(self.app._shortcut_bindings,[])
+        self.assertEqual(self.app._settings_bindings,[])
+
+    def test_mouse_mode_keeps_old_stop_digit_as_text_and_panel_stop_saves(self):
+        from pynput import keyboard
+        app=self.app
+        app.manager.script_activation='mouse'
+        app.manager.button_hotkeys['stop_record']='2'
+        app.countdown_var.set(False)
+        with patch('core.keyboard.Listener'),patch('core.mouse.Listener'),patch('core.play_sound'):
+            app._cmd_start_recording()
+            recorder=app.manager.recorder
+            recorder.ignore_keyboard=Mock(return_value=False)
+            digit=keyboard.KeyCode.from_vk(50,char='2')
+            recorder._on_key_press(digit);recorder._on_key_release(digit)
+            self.assertEqual(app.manager.state,MacroManager.STATE_RECORDING)
+            app._cmd_emergency_stop()
+            self.assertEqual(app.manager.state,MacroManager.STATE_IDLE)
+            self.assertEqual([a.key for a in self.profile.actions],['vk_50','vk_50'])
+
+    def test_profile_hotkey_uses_ui_hide_before_play_path(self):
+        with patch.object(self.app.manager,'start_playing_profile') as play:
+            self.app.manager._on_hotkey_play_profile(self.profile)
+            play.assert_not_called()
+            self.app._process_ui_events()
+            self.assertEqual(self.root.state(),'withdrawn')
+            self.assertIsNotNone(self.app._pending_play)
+            play.assert_not_called()
+            self.app._cmd_emergency_stop()
+
+    def test_real_panel_bounds_are_protected_from_macro_click(self):
+        self.app._hide_to_tray()
+        self.root.update()
+        win=self.app.record_notice.window
+        x,y=win.winfo_rootx()+40,win.winfo_rooty()+40
+        with patch.object(self.app.manager.player,'mouse_controller') as mouse:
+            with self.assertRaises(RuntimeError):
+                self.app.manager.player._execute_action(MacroAction('mouse_click',0,x=x,y=y,pressed=True))
+            mouse.press.assert_not_called()
+
+    def test_play_hides_main_before_start_and_stop_cancels_pending_play(self):
+        self.app.manager.script_activation = 'mouse'
+        with patch.object(self.app.manager, 'start_playing_profile') as play, patch.object(self.app.overlay_input,'activate'):
+            self.app._cmd_start_playing()
+            self.assertEqual(self.root.state(), 'withdrawn')
+            self.assertTrue(self.app.record_notice.pinned)
+            play.assert_not_called()
+            self.app._cmd_start_playing()
+            self.app._cmd_emergency_stop()
+            until = time.monotonic()+.25
+            while time.monotonic()<until: self.root.update(); time.sleep(.01)
+            play.assert_not_called()
+            self.assertIsNone(self.app._pending_play)
+            self.app._cmd_start_playing()
+            until = time.monotonic()+.25
+            while time.monotonic()<until: self.root.update(); time.sleep(.01)
+            play.assert_called_once_with(self.profile)
+            self.assertEqual(self.root.state(), 'withdrawn')
+
+    def test_settings_activation_saves_and_rebuilds_listeners(self):
+        from tkinter import ttk
+        self.app._cmd_open_settings()
+        self.app.activation_var.set('mouse')
+        save = next(w for w in self.app.settings_tab.footer.winfo_children()
+                    if isinstance(w,ttk.Button) and w.cget('text')=='Lưu cài đặt')
+        save.invoke()
+        self.assertEqual(self.app.manager.script_activation, 'mouse')
+        self.assertEqual(MacroManager(self.app.manager.library_path).script_activation, 'mouse')
+
     def test_script_selector_is_readable_and_shows_explicit_hotkey(self):
         second = ScriptProfile(name='Web auto', hotkey='0', actions=[])
         self.app.manager.profiles.append(second)
@@ -408,6 +535,7 @@ class UITest(unittest.TestCase):
         with patch.object(MacroStorage, 'default_library_path', return_value=str(Path(self.temporary.name) / 'library.json')), \
                 patch.object(ui.HocVetApp, '_setup_system_tray'):
             self.app = ui.HocVetApp(self.root)
+        self.app.manager.script_activation = 'hotkey'
         self.profile = ScriptProfile(name='Kịch bản giữ lại', actions=[MacroAction('key_press', 0, key='a')])
         self.app.manager.profiles = [self.profile]
         self.app.manager.active_profile_id = self.profile.id
@@ -615,6 +743,7 @@ class UITest(unittest.TestCase):
     def test_ui_stop_click_is_not_recorded(self):
         from pynput import mouse
         app = self.app
+        app.manager.script_activation = 'mouse'
         self.root.deiconify()
         self.root.lift()
         self.root.update()
@@ -665,6 +794,7 @@ class UITest(unittest.TestCase):
     def test_save_failure_does_not_report_success_or_discard_recording(self):
         from pynput import keyboard
         app = self.app
+        app.manager.script_activation = 'mouse'
         with patch('core.keyboard.Listener'), patch('core.mouse.Listener'), patch('core.play_sound'), \
                 patch.object(app.record_notice, 'show') as notice, patch.object(app, 'notify_app'), \
                 patch.object(app.manager, 'save_library', side_effect=OSError('disk unavailable')):

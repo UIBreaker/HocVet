@@ -390,6 +390,10 @@ class MacroPlayer:
         self.on_finished: Optional[Callable[[bool, bool], None]] = None
         self.on_wait: Optional[Callable[[str], None]] = None
         self.last_error = ''
+        self.protect_mouse = None
+        self.protect_keyboard = None
+        self.on_input_finished = None
+        self._held_buttons = set()
 
     def is_running(self) -> bool:
         return self.is_playing
@@ -409,6 +413,12 @@ class MacroPlayer:
         except Exception:
             pass
 
+        for button in tuple(self._held_buttons):
+            try:
+                self.mouse_controller.release(button)
+            except Exception:
+                pass
+            self._held_buttons.discard(button)
         modifier_keys = [
             keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
             keyboard.Key.alt_l, keyboard.Key.alt_r,
@@ -491,6 +501,12 @@ class MacroPlayer:
             aborted = True
         finally:
             self._release_all_modifiers()
+            if self.on_input_finished:
+                try:
+                    self.on_input_finished()
+                except Exception as error:
+                    self.last_error = str(error)
+                    aborted = True
             self.is_playing = False
             if not aborted:
                 play_sound("stop_play")
@@ -499,6 +515,12 @@ class MacroPlayer:
 
     def _execute_action(self, action: MacroAction):
         act_type = action.action_type
+        if act_type.startswith('mouse_') and self.protect_mouse:
+            point = (action.x, action.y) if action.x is not None and action.y is not None else self.mouse_controller.position
+            if self.protect_mouse(*point):
+                raise RuntimeError('Tọa độ kịch bản chạm bảng Học Vẹt. Đã dừng trước thao tác; kéo bảng sang vị trí khác rồi chạy lại.')
+        if act_type in ('key_press', 'key_release') and self.protect_keyboard and self.protect_keyboard():
+            raise RuntimeError('Học Vẹt đang nhận bàn phím. Đã dừng để bảo vệ bảng điều khiển; chọn lại cửa sổ công việc rồi chạy.')
 
         if act_type in ('wait_window', 'wait_image'):
             if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
@@ -523,8 +545,10 @@ class MacroPlayer:
             btn = str_to_button(action.button or "left")
             if action.pressed:
                 self.mouse_controller.press(btn)
+                self._held_buttons.add(btn)
             else:
                 self.mouse_controller.release(btn)
+                self._held_buttons.discard(btn)
 
         elif act_type == "mouse_move":
             if action.x is not None and action.y is not None:
@@ -789,6 +813,7 @@ class MacroManager:
 
         # Cài đặt ứng dụng
         self.minimize_to_tray_on_close = True
+        self.script_activation = 'mouse'
 
         # Global HotKeys Listener
         self._global_hotkeys: Optional[keyboard.GlobalHotKeys] = None
@@ -880,6 +905,8 @@ class MacroManager:
             self.hotkey_record_str = settings.get("hotkey_record", "F8")
             self.hotkey_panic_str = settings.get("hotkey_panic", "ESC")
             self.minimize_to_tray_on_close = settings.get("minimize_to_tray_on_close", True)
+            activation = settings.get('script_activation', 'mouse')
+            self.script_activation = activation if activation in ('mouse', 'hotkey') else 'mouse'
         # Phím dừng học phải hoạt động khi người dùng đang thao tác ở phần mềm khác.
         self.button_hotkey_scopes['stop_record'] = 'global'
 
@@ -888,6 +915,7 @@ class MacroManager:
             "hotkey_record": self.hotkey_record_str,
             "hotkey_panic": self.hotkey_panic_str,
             "minimize_to_tray_on_close": self.minimize_to_tray_on_close,
+            "script_activation": self.script_activation,
             "button_hotkeys": self.button_hotkeys,
             "button_hotkey_scopes": self.button_hotkey_scopes,
         }
@@ -905,14 +933,14 @@ class MacroManager:
     def start_global_hotkeys(self):
         """Khởi động bộ lắng nghe phím tắt toàn hệ thống cho tất cả kịch bản."""
         self.stop_global_hotkeys()
-        if self.shortcuts_suspended:
+        if self.shortcuts_suspended or self.script_activation == 'mouse':
             return
 
         hotkey_map = {}
 
         # 1. Phím tắt Bắt đầu / Dừng học thao tác
         norm_rec = normalize_hotkey(self.hotkey_record_str)
-        if norm_rec:
+        if norm_rec and self.script_activation == 'hotkey':
             hotkey_map[norm_rec] = self._on_hotkey_toggle_record
 
         # 2. Phím tắt Dừng khẩn cấp
@@ -922,7 +950,7 @@ class MacroManager:
 
         # 3. Phím tắt riêng cho TỪNG kịch bản được kích hoạt (Enabled)
         for profile in self.profiles:
-            if not profile.enabled:
+            if self.script_activation != 'hotkey' or not profile.enabled:
                 continue
             norm_hk = normalize_hotkey(profile.hotkey)
             if norm_hk and norm_hk not in hotkey_map:
@@ -930,6 +958,8 @@ class MacroManager:
                 hotkey_map[norm_hk] = (lambda p=profile: self._on_hotkey_play_profile(p))
 
         for action, hotkey in self.button_hotkeys.items():
+            if self.script_activation == 'mouse' and action in ('play', 'stop_record', 'work_run', 'work_learn'):
+                continue
             if hotkey and (action == 'stop_record' or self.button_hotkey_scopes.get(action) == 'global'):
                 hotkey_map.setdefault(normalize_hotkey(hotkey), lambda name=action: self._on_command_hotkey(name))
 
@@ -966,17 +996,22 @@ class MacroManager:
         self.button_hotkey_scopes['stop_record'] = 'global'
 
     def _on_command_hotkey(self, action):
+        if self.script_activation == 'mouse':
+            return
         if self.on_command and (self.state == self.STATE_IDLE or
                 action == 'stop_record' and self.state in (self.STATE_RECORDING, self.STATE_COUNTDOWN)):
             self.on_command(action)
 
     def _on_hotkey_panic(self):
+        if self.script_activation != 'hotkey': return
         if self.on_panic:
             self.on_panic()
         else:
             self.stop_playing()
 
     def _on_hotkey_toggle_record(self):
+        if self.script_activation != 'hotkey':
+            return
         if self.on_record_toggle:
             self.on_record_toggle()
             return
@@ -986,11 +1021,14 @@ class MacroManager:
             self.stop_recording()
 
     def _on_hotkey_play_profile(self, profile: ScriptProfile):
+        if self.script_activation != 'hotkey':
+            return
         if self.state == self.STATE_IDLE and not self.external_busy and profile.enabled and profile.actions:
-            self.set_active_profile(profile.id)
             if self.on_profile_triggered:
                 self.on_profile_triggered(profile)
-            self.start_playing_profile(profile)
+            else:
+                self.set_active_profile(profile.id)
+                self.start_playing_profile(profile)
 
     # ------------------------------------------
     # GHI & PHÁT KỊCH BẢN
@@ -1001,6 +1039,8 @@ class MacroManager:
         self.recorder.record_movement = record_movement
         self.recorder.control_hotkeys = [self.hotkey_record_str, self.hotkey_panic_str,
                                          self.button_hotkeys.get('stop_record', '')]
+        if self.script_activation == 'mouse':
+            self.recorder.control_hotkeys = []
         self.recorder.start()
         self._set_state(self.STATE_RECORDING)
 

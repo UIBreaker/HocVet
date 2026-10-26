@@ -1,3 +1,36 @@
+# Học Vẹt v0.15.1
+
+- Từ v0.14.1: thêm bảng nổi có tiến trình và danh sách kịch bản, thu cửa sổ chính vào khay trước khi chạy; lưu lựa chọn kích hoạt bằng chuột hoặc phím.
+- Bỏ việc dừng khi tọa độ trùng bảng nổi. Trong lúc phát, bảng dùng chế độ chuột xuyên qua để thao tác đến đúng cửa sổ bên dưới, vẫn giữ hình ảnh và tiến độ.
+- Bộ lọc chuột phân biệt thao tác phát với chuột thật. Chỉ chuột thật bấm Dừng mới dừng ở chế độ chuột; không truyền các cú bấm tay khác trên bảng xuống cửa sổ công việc.
+- Xác nhận hàng đợi chuột hoàn tất trước khi bật tương tác với bảng trở lại. Bảng giữ nguyên vị trí, không tự chuyển góc để tránh tọa độ.
+- Hai chế độ kích hoạt loại trừ nhau: chuột tắt mọi phím gán; phím khóa các nút Học / Chạy / Dừng bằng chuột. Áp dụng cả màn hình chính, bảng nổi và tab Công việc. Có thể dùng chuột để mở Cài đặt và đổi chế độ.
+- Kiểm thử phát 10× bấm / cuộn tại đúng nút Dừng trên bảng: cửa sổ mẫu bên dưới nhận thao tác, không kích hoạt nút trên bảng và không tự dừng.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Mặc định dùng chuột: các phím đã gán, kể cả Esc, chỉ hoạt động sau khi chọn **Dùng phím đã gán** trong Cài đặt.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.15.1-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Macro màn hình dùng chuột thật; Công việc riêng có các giới hạn Windows / HIS như mô tả trong README. Chưa xác minh trên HIS thực tế.
+
+---
+
+# Học Vẹt v0.15.0
+
+- Thu cửa sổ chính vào khay trước khi chạy từ nút Chạy, bảng nổi hoặc phím kịch bản. Các yêu cầu chạy liên tiếp trong lúc chuẩn bị không tạo lượt chạy trùng; bấm Dừng hủy được lượt đang chuẩn bị.
+- Bảng nổi giữ tiến trình ở trên, danh sách kịch bản và nút Chạy ở dưới; ba kịch bản/trang, hỗ trợ lăn chuột chuyển trang. Có nút Dừng và Mở ứng dụng; không lấy tiêu điểm của cửa sổ công việc.
+- Cài đặt cách kích hoạt bằng chuột hoặc phím đã gán, được lưu qua cập nhật. Mặc định bằng chuột để tránh gõ nhầm phím kích hoạt; giữ phím Dừng khẩn cấp ở mọi chế độ.
+- Khi đang chạy, khóa chọn kịch bản / chuyển trang / mở cửa sổ chính. Bảng tự chọn góc ít giao tọa độ kịch bản, kéo được tiêu đề khi rảnh. Bộ phát dừng trước thao tác chuột / phím chạm giao diện Học Vẹt, không điều khiển bảng bằng macro.
+- Dừng ở bảng nổi trong khi học sẽ dừng và lưu; không ghi thao tác bấm Dừng. Giữ bảng khi hoàn tất, hiển thị 100%, sẵn sàng cho lượt tiếp theo.
+
+Macro màn hình vẫn sử dụng chuột thật; nếu tọa độ giao với bảng và không có góc phù hợp, cần di chuyển bảng hoặc dùng phiên Công việc riêng. Các giới hạn Windows / HIS của v0.14 vẫn áp dụng.
+
+---
+
 # Học Vẹt v0.14.1
 
 - Danh sách kịch bản dùng chữ lớn hơn, nền chọn xanh nhạt, phân biệt rõ tên và phím chạy. Hiển thị số bước và số kịch bản đã lưu ngay dưới ô chọn.

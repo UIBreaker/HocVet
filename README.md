@@ -1,20 +1,21 @@
-# Học Vẹt · v0.14.1
+# Học Vẹt · v0.15.1
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.14.1
+## Có gì mới trong 0.15.1
 
-- Danh sách kịch bản chữ lớn, nền chọn xanh nhạt; hiển thị rõ phím chạy, số bước và tổng số kịch bản.
-- Thêm nút đỏ **Xóa kịch bản** cạnh **Tạo mới**, có xác nhận trước khi xóa.
-- Chặn xóa khi đang học / chạy; giữ lại kịch bản nếu lưu thư viện thất bại. Thư viện luôn giữ ít nhất một kịch bản.
+- Bảng nổi có tiến trình, danh sách kịch bản và nút Chạy; ứng dụng thu vào khay trước khi phát.
+- Chuột của kịch bản xuyên qua bảng nổi tới cửa sổ bên dưới; tọa độ trùng bảng không làm dừng và không bấm nhầm nút.
+- Chuột thật vẫn bấm được **Dừng** khi chọn chế độ chuột; thao tác phát không được xem là cú bấm Dừng của người dùng.
+- Hai chế độ loại trừ nhau: **dùng chuột** tắt toàn bộ phím đã gán, kể cả Dừng khẩn cấp; **dùng phím** khóa nút Học / Chạy / Dừng bằng chuột.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.14.1-Windows.zip** tại [bản phát hành 0.14.1](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.14.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+Tải **HocVet.exe** hoặc **HocVet-v0.15.1-Windows.zip** tại [bản phát hành 0.15.1](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.15.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -24,8 +25,8 @@ Khi nâng cấp từ Smart Operation, đặt ứng dụng cạnh `scripts_librar
 
 ## Sử dụng nhanh
 
-1. Chọn kịch bản (hoặc **+ Tạo mới**), nhấn **F8**. Thông báo nổi đếm ngược **3–2–1**, sau đó báo **Đang học** ngay cả khi cửa sổ đang thu vào khay. Làm các bước trên phần mềm đích; nhấn lại **F8** hoặc phím **Dừng học** đã gán để dừng/lưu. Thông báo **Đã dừng & lưu thành công** xuất hiện sau khi lưu xong. Bấm Dừng trên Học Vẹt không bị ghi vào kịch bản.
-2. Chọn **Chạy** hoặc dùng phím riêng của kịch bản (mặc định mẫu: **F9**). Nhấn **Esc** để dừng khẩn cấp, kể cả trong khi chờ điều kiện.
+1. Chọn kịch bản (hoặc **+ Tạo mới**). Ở chế độ chuột mặc định, bấm **Học thao tác**; ở chế độ phím, nhấn **F8**. Chờ đếm ngược **3–2–1** và thông báo **Đang học** rồi thao tác trên phần mềm đích. Bấm **Dừng** trên bảng nổi ở chế độ chuột; ở chế độ phím, nhấn lại **F8** hoặc phím **Dừng học** đã gán. Thông báo **Đã dừng & lưu thành công** xuất hiện sau khi lưu xong. Cú bấm Dừng không bị ghi vào kịch bản.
+2. Chọn **Chạy** trên màn hình chính hoặc từng dòng ở bảng nổi. Nếu bật chế độ phím, có thể dùng phím riêng của kịch bản (mặc định mẫu: **F9**). Ở chế độ phím, nhấn **Esc** để dừng khẩn cấp; ở chế độ chuột, bấm **Dừng** trên bảng nổi.
 3. Mở **Chi tiết / sửa bước**, chọn một dòng, dùng **+ Chờ cửa sổ** / **+ Chờ ảnh / nút** để chèn điều kiện trước dòng đó; không chọn dòng sẽ thêm ở cuối. **Sửa điều kiện** để đổi ảnh hoặc thời hạn.
 4. **Xuất file** tạo một file `.hocvet` nén gồm kịch bản, cài đặt phát và ảnh mẫu. Người nhận dùng **Nhập file** để thêm thành kịch bản mới. Không ghi đè kịch bản đang có; vẫn đọc được JSON cũ.
 5. Mở **Hướng dẫn** ngay trong ứng dụng để xem cách lưu, chia sẻ, gán phím và kiểm tra ảnh.
@@ -46,12 +47,31 @@ Nếu không lưu được thư viện, ứng dụng báo lỗi và giữ nguyê
 
 ![Danh sách và nút xóa kịch bản](docs/images/script-selector.png)
 
+## Bảng nổi khi chạy nền (v0.15)
+
+Khi bấm **Chạy**, Học Vẹt thu vào khay trước rồi bắt đầu phát sau khoảng 0,2 giây để cửa sổ công việc nhận lại tiêu điểm. Bảng nổi không lấy tiêu điểm; phần trên là tiến trình, phần dưới có tên, số bước và nút **Chạy** cho từng kịch bản màn hình. Chọn **Trước / Sau** hoặc lăn chuột để chuyển trang. Bảng giữ nguyên khi hoàn tất, sẵn sàng cho lượt tiếp theo. Kịch bản rỗng / bị tắt không chạy được.
+
+**Cài đặt → Kích hoạt kịch bản** có hai lựa chọn:
+
+- **Bấm chuột ở bảng nổi** (mặc định): tắt toàn bộ phím đã gán, kể cả Dừng khẩn cấp và phím riêng của kịch bản. Gõ số từng gán để dừng sẽ không ngắt công việc. Bấm **Học thao tác** trên màn hình chính để học, rồi **Dừng** ở bảng nổi để lưu. Không xóa cấu hình phím đã gán.
+- **Dùng phím đã gán**: bật các phím đó và khóa nút Học / Chạy / Dừng bằng chuột ở màn hình chính, bảng nổi và tab Công việc. Phím **Dừng khẩn cấp** chỉ hoạt động trong chế độ này.
+
+Kéo tiêu đề bảng để đổi vị trí khi đang rảnh. Bảng giữ nguyên vị trí khi phát. Các nút Chạy / chuyển trang / Mở ứng dụng bị khóa trong lúc chạy; **Dừng** bằng chuột chỉ dùng được ở chế độ chuột. Bấm **Mở ứng dụng** khi đã dừng để trở về màn hình chính.
+
+Bấm vào bảng không được ghi thành thao tác. Khi phát macro màn hình, bảng vẫn hiển thị nhưng nhận diện chuột xuyên qua; cú bấm / cuộn được gửi tới cửa sổ bên dưới tại đúng tọa độ. Bộ lọc riêng chỉ nhận cú bấm chuột thật vào Dừng ở chế độ chuột, không nhận cú bấm do kịch bản phát ra. Các cú bấm tay khác trên bảng trong lúc phát được chặn để không bấm nhầm xuống cửa sổ bên dưới. Sau khi hàng đợi chuột hoàn tất, bảng nhận chuột trở lại. Kiểm tra bàn phím vẫn dừng nếu cửa sổ Học Vẹt bất ngờ nhận tiêu điểm. Macro màn hình vẫn dùng chuột thật của Windows; dùng tab Công việc riêng khi cần nhập liệu độc lập.
+
+![Bảng nổi tiến trình và kịch bản](docs/images/tray-panel.png)
+
+![Bảng nổi khi sẵn sàng](docs/images/tray-panel-idle.png)
+
 ## Cài đặt phím tắt
 
 Gán phím đơn (F6, K) hoặc tổ hợp (Ctrl+Shift+K) cho các nút, từng mức tốc độ, tùy chọn, thao tác khay và các nút Lưu / Hủy / Chụp ảnh trong hộp thoại.
 
+Các phím đã gán chỉ hoạt động khi chọn **Cài đặt → Kích hoạt kịch bản → Dùng phím đã gán**. Ở chế độ chuột mặc định, mọi phím gán đều tắt, kể cả **Esc / Dừng khẩn cấp**; dùng nút **Dừng** trên bảng nổi. Đổi chế độ không xóa cấu hình phím.
+
 - Gõ tên phím hoặc bấm **Ghi phím**, rồi chọn **Lưu cài đặt**.
-- Chọn **Trong ứng dụng** hoặc **Toàn cục**. Phím toàn cục dùng được khi thu vào khay. Học và Dừng khẩn cấp luôn là toàn cục.
+- Chọn **Trong ứng dụng** hoặc **Toàn cục**. Trong chế độ phím, phím toàn cục dùng được khi thu vào khay; Học và Dừng khẩn cấp luôn ở phạm vi toàn cục.
 - **Dừng học** luôn là toàn cục; gán phím `2` sẽ dừng được khi đang thao tác ở phần mềm khác. Cài đặt cũ ở phạm vi Trong ứng dụng được chuyển tự động cho lệnh này. Hàng số và bàn phím số đều được hỗ trợ.
 - Bỏ trống để bỏ gán, trừ Học và Dừng khẩn cấp. Các nút trong hộp thoại dùng phím theo ngữ cảnh. Khi gán phím, lắng nghe toàn cục tạm ngừng.
 - Báo lỗi khi phím trùng / chồng tổ hợp với lệnh hoặc kịch bản khác, ví dụ F6 và Ctrl+F6. Phím chữ đơn không lấy mất ký tự đang nhập trong ô văn bản.
@@ -82,7 +102,7 @@ Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; k
 
 Bốn tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt** không có thanh cuộn. Chi tiết chia 12 bước/trang, cài đặt chia 6 lệnh/trang. Thanh tốc độ hỗ trợ mọi mức nguyên từ **1× đến 10×**. Chỉ dùng thông báo nổi của Học Vẹt, có thanh tiến độ khi chạy; không gửi thông báo Windows.
 
-Trong **Công việc riêng**, chọn loại phiên rồi bấm **Mở phiên**. Bấm **Học trong tab**, thao tác trên ảnh xem trước bằng chuột đỏ, nhập tiếng Việt ở ô **Nhập chữ** rồi **Gửi vào phiên**. **Dừng** sẽ tự lưu; chọn **Chạy công việc** để phát lại. Có thể đổi tab, dùng ứng dụng khác hoặc thu Học Vẹt vào khay trong lúc chạy. Phím Dừng học / Khẩn cấp cũng dừng công việc riêng. Các nút của tab đều có thể gán phím trong Cài đặt.
+Trong **Công việc riêng**, chọn loại phiên rồi bấm **Mở phiên**. Ở chế độ chuột, bấm **Học trong tab**, thao tác trên ảnh xem trước bằng chuột đỏ, nhập tiếng Việt ở ô **Nhập chữ** rồi **Gửi vào phiên**. **Dừng** sẽ tự lưu; chọn **Chạy công việc** để phát lại. Có thể đổi tab, dùng ứng dụng khác hoặc thu Học Vẹt vào khay trong lúc chạy. Ở chế độ phím, các nút Học / Chạy / Dừng bị khóa bằng chuột; gán phím tương ứng trong Cài đặt để sử dụng. Phím Dừng học / Khẩn cấp cũng dừng công việc riêng khi đang ở chế độ phím.
 
 - **Web riêng:** cần Microsoft Edge đã cài. Dùng trình duyệt headless với hồ sơ riêng `%LOCALAPPDATA%\HocVet\web-session`; đăng nhập qua ảnh xem trước nếu cần. Không mở hồ sơ Edge cá nhân. Chuột và phím chỉ gửi vào phiên này. Trang dùng xác thực đặc biệt, tải file hoặc cửa sổ mới chưa được hỗ trợ đầy đủ.
 - **Windows / HIS tương thích:** chọn một cửa sổ đang mở và giữ nguyên kích thước khi chạy. Hỗ trợ ô nhập Edit/RichEdit, một số WinForms và nút Windows chuẩn. Có thể dùng ứng dụng khác nhưng không thu nhỏ cửa sổ đích. Không dùng chuột thật, không đưa cửa sổ đích lên trước. Khi bị chặn, mất cửa sổ, đổi tiến trình, thu nhỏ hoặc không cung cấp ảnh, phiên sẽ dừng/báo lỗi. Thông báo hoàn tất chỉ xác nhận đã gửi thao tác; cần kiểm tra kết quả trên phần mềm đích.
@@ -109,14 +129,14 @@ Kiểm thử:
 
 ```powershell
 python test_core.py
-python -m unittest -v test_features test_theme test_workspace
+python -m unittest -v test_features test_theme test_workspace test_overlay_input
 ```
 
-Kiểm thử tích hợp Edge và cửa sổ Windows mẫu (cần Microsoft Edge):
+Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên qua bảng nổi (cần Microsoft Edge; bài kiểm thử bảng nổi dùng chuột thật trên cửa sổ mẫu rồi trả lại vị trí cũ):
 
 ```powershell
 $env:HOCVET_INTEGRATION = '1'
-python -m unittest -v test_workspace.IntegrationTests
+python -m unittest -v test_workspace.IntegrationTests test_overlay_input.NativePassThroughTests
 ```
 
 Đóng gói (cần PyInstaller):
