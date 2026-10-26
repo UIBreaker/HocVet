@@ -15,7 +15,7 @@ Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.15.1-Windows.zip** tại [bản phát hành 0.15.1](https://github.com/UIBreaker/Smart_Operation/releases/tag/v0.15.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/Smart_Operation/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã vẫn dùng địa chỉ Smart_Operation.
+Tải **HocVet.exe** hoặc **HocVet-v0.15.1-Windows.zip** tại [bản phát hành 0.15.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.15.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -117,8 +117,8 @@ Công việc này dùng tọa độ bên trong phiên, **cần học lại trong
 Yêu cầu Windows 10 / 11 và Python 3.10 trở lên.
 
 ```powershell
-git clone https://github.com/UIBreaker/Smart_Operation.git
-cd Smart_Operation
+git clone https://github.com/UIBreaker/HocVet.git
+cd HocVet
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
