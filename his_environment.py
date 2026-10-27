@@ -8,19 +8,29 @@ from pathlib import Path
 class HisEnvironment:
     MAX_ROWS=10000
     MAX_FIELDS=50
+    MAX_BYTES=30*1024*1024
 
     def __init__(self,path):
         self.path=Path(path)
         self.installed=False
         self.fields=[]
         self.rows=[{}]
+        self.active_id='default'
+        self.environments=[{'id':'default','name':'Môi trường 1','fields':self.fields,'rows':self.rows}]
         self.error=''
         if self.path.exists():
             try:
-                if self.path.stat().st_size>30*1024*1024: raise ValueError('Bảng vượt quá 30 MB.')
+                if self.path.stat().st_size>self.MAX_BYTES: raise ValueError('Bảng vượt quá 30 MB.')
                 data=json.loads(self.path.read_text(encoding='utf-8'))
-                self.validate(data)
-                self.installed=data['installed'];self.fields=data['fields'];self.rows=data['rows'] or [{}]
+                if not isinstance(data,dict):raise ValueError('Bảng dữ liệu không hợp lệ.')
+                if data.get('version')==2:
+                    self._validate_environments(data['environments'],data['active_id'])
+                    if type(data['installed']) is not bool:raise ValueError('Trạng thái tiện ích không hợp lệ.')
+                    self.environments=data['environments'];self.active_id=data['active_id']
+                else:
+                    self.validate(data)
+                    self.environments=[{'id':'default','name':'Môi trường 1','fields':data['fields'],'rows':data['rows'] or [{}]}]
+                self.installed=data['installed'];self._select_active()
             except (OSError,ValueError,KeyError,TypeError) as error:
                 self.error=f'Chưa đọc được bảng dữ liệu: {error}. File được giữ nguyên tại {self.path}.'
 
@@ -49,9 +59,54 @@ class HisEnvironment:
         data={'version':1,'installed':self.installed if installed is None else installed,
               'fields':self.fields if fields is None else fields,'rows':self.rows if rows is None else rows}
         self.validate(data)
+        environments=[dict(env,fields=data['fields'],rows=data['rows']) if env['id']==self.active_id else env for env in self.environments]
+        self._save(environments,self.active_id,data['installed'])
+
+    def _select_active(self):
+        active=next(env for env in self.environments if env['id']==self.active_id)
+        self.fields=active['fields'];self.rows=active['rows']
+
+    @classmethod
+    def _validate_environments(cls,environments,active_id):
+        if not isinstance(environments,list) or not 1<=len(environments)<=50:raise ValueError('Tối đa 50 môi trường.')
+        ids=set();names=set();field_ids=set()
+        for env in environments:
+            if not isinstance(env,dict) or not isinstance(env.get('id'),str) or not env['id'] or env['id'] in ids:
+                raise ValueError('Mã môi trường không hợp lệ.')
+            name=env.get('name')
+            if not isinstance(name,str) or not name.strip() or len(name)>100 or '\0' in name or name.strip().casefold() in names:
+                raise ValueError('Tên môi trường phải khác nhau, dài tối đa 100 ký tự.')
+            cls.validate(dict(installed=True,fields=env.get('fields'),rows=env.get('rows')))
+            current_ids={field['id'] for field in env['fields']}
+            if current_ids & field_ids:raise ValueError('Mã trường bị trùng giữa các môi trường.')
+            field_ids.update(current_ids)
+            ids.add(env['id']);names.add(name.strip().casefold())
+        if active_id not in ids:raise ValueError('Môi trường đang chọn không tồn tại.')
+
+    def _save(self,environments,active_id,installed=None):
+        if self.error:raise ValueError(self.error)
+        self._validate_environments(environments,active_id)
         from core import MacroStorage
+        enabled=self.installed if installed is None else installed
+        data=dict(version=2,installed=enabled,active_id=active_id,environments=environments)
+        if len(json.dumps(data,ensure_ascii=False,indent=2).replace('\n','\r\n').encode('utf-8'))>self.MAX_BYTES:raise ValueError('Tổng dữ liệu môi trường vượt quá 30 MB.')
         MacroStorage._atomic_json(data,self.path)
-        self.installed=data['installed'];self.fields=data['fields'];self.rows=data['rows']
+        self.environments=environments;self.active_id=active_id;self.installed=enabled;self._select_active()
+
+    def create_environment(self,name):
+        env=dict(id=uuid.uuid4().hex,name=name.strip(),fields=[],rows=[{}])
+        self._save(self.environments+[env],env['id'])
+
+    def select_environment(self,environment_id):
+        self._save(self.environments,environment_id)
+
+    def clear_cells(self,first_row,last_row,first_column,last_column):
+        if any(type(value) is not int for value in (first_row,last_row,first_column,last_column)) or not 0<=first_row<=last_row<self.MAX_ROWS or not 0<=first_column<=last_column<len(self.fields):
+            raise ValueError('Vùng chọn không hợp lệ.')
+        rows=copy.deepcopy(self.rows)
+        for row in rows[first_row:last_row+1]:
+            for field in self.fields[first_column:last_column+1]:row.pop(field['id'],None)
+        self.update(rows=rows)
 
     def add_field(self,name):
         name=name.strip()
@@ -81,10 +136,15 @@ class HisEnvironment:
         if not copies:return loop_count,None
         if self.error: raise ValueError(self.error)
         if not self.installed: raise ValueError('Hãy cài Hỗ trợ ĐK KCB HIS trước khi chạy kịch bản lấy dữ liệu từ bảng.')
-        ids={field['id'] for field in self.fields}
-        names={field['name'].strip().casefold():field['id'] for field in self.fields}
+        requested={action.data_field for action in copies if isinstance(action.data_field,str)}
+        sources=[env for env in self.environments if any(field['id'] in requested for field in env['fields'])]
+        if len(sources)>1:raise ValueError('Kịch bản đang lấy dữ liệu từ nhiều môi trường. Hãy học các trường trên cùng một bảng.')
+        source=sources[0] if sources else next(env for env in self.environments if env['id']==self.active_id)
+        fields=source['fields'];rows=source['rows']
+        ids={field['id'] for field in fields}
+        names={field['name'].strip().casefold():field['id'] for field in fields}
         resolved={}
-        last_row=max((index+1 for index,row in enumerate(self.rows) if any(value.strip() for value in row.values())),default=0)
+        last_row=max((index+1 for index,row in enumerate(rows) if any(value.strip() for value in row.values())),default=0)
         available=last_row
         for action in copies:
             if type(action.data_row) is not int or not 1<=action.data_row<=self.MAX_ROWS:raise ValueError('STT học dữ liệu không hợp lệ.')
@@ -101,7 +161,7 @@ class HisEnvironment:
         copies=list({(action.data_field,action.data_row):action for action in copies}.values())
         effective=available if loop_count==0 else loop_count
         if effective<1 or effective>available: raise ValueError(f'Bảng chỉ đủ {max(0,available)} hàng cho kịch bản này. Giảm số lần chạy hoặc thêm dữ liệu.')
-        snapshot=copy.deepcopy(self.rows)
+        snapshot=copy.deepcopy(rows)
         for loop in range(effective):
             for action in copies:
                 value=snapshot[action.data_row-1+loop].get(resolved[action.data_field],'')

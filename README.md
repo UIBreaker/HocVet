@@ -1,21 +1,21 @@
-# Học Vẹt · v0.17.0
+# Học Vẹt · v0.18.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.17.0
+## Có gì mới trong 0.18.0
 
-- Thêm **Tính năng mở rộng** và công cụ **Hỗ trợ ĐK KCB HIS** với bảng dữ liệu, STT tự động và dán từ Excel.
-- Học lấy dữ liệu theo trường, mỗi vòng dùng hàng kế tiếp; giữ tiếng Việt / số 0 đầu và kiểm tra dữ liệu trước khi chạy.
-- **Thoát toàn bộ** dừng, lưu và đóng hẳn ứng dụng.
-- Thanh tốc độ hiển thị đủ **1×–10×**; số lần chạy và khoảng nghỉ có đơn vị rõ ràng.
+- Lưu **nhiều môi trường HIS** có tên riêng; tự chuyển dữ liệu cũ và chạy đúng bảng đã học.
+- Quét vùng bằng kéo chuột / Shift; **Ctrl+A**, **Ctrl+C**, **Delete** và **Làm trống bảng** có xác nhận.
+- Bảng cuộn dọc / ngang, **Ctrl+V** dán danh sách hoặc nhiều cột từ Excel, giữ tiếng Việt và số 0 đầu.
+- **Thoát toàn bộ** thành tab riêng; khóa sửa bảng khi học / chạy và giữ dữ liệu nếu lưu thất bại.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.17.0-Windows.zip** tại [bản phát hành 0.17.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.17.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.18.0-Windows.zip** tại [bản phát hành 0.18.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.18.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -113,23 +113,29 @@ Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; k
 ## Hỗ trợ ĐK KCB HIS (v0.17)
 
 1. Mở tab **Tính năng mở rộng** cạnh Cài đặt → **Cài đặt** công cụ **Hỗ trợ ĐK KCB HIS**. Tab **Môi trường thao tác** sẽ xuất hiện.
-2. Bấm **+** ở tiêu đề (hoặc **+ Trường dữ liệu**) để thêm Họ và tên, Ngày sinh, Giới tính, Địa chỉ, CCCD, SĐT… STT là số hàng tự động, không nhập / đổi thành trường khác. Nhấp đúp ô để nhập, Enter để lưu, Esc hủy; phím mũi tên để chuyển ô. Có thể chọn ô bắt đầu rồi **Dán bảng từ Excel**: chỉ chọn dữ liệu, không gồm STT hoặc dòng tiêu đề. Thêm đủ trường trước khi dán. Dữ liệu được giữ dạng văn bản, không tự chuyển ngày hay bỏ số 0 đầu.
+2. Bấm **+** ở tiêu đề (hoặc **+ Trường dữ liệu**) để thêm Họ và tên, Ngày sinh, Giới tính, Địa chỉ, CCCD, SĐT… STT là số hàng tự động, không nhập / đổi thành trường khác. Nhấp đúp ô để nhập, Enter để lưu, Esc hủy; phím mũi tên để chuyển ô. Có thể chọn ô bắt đầu rồi **Dán dữ liệu · Ctrl+V**: chỉ chọn dữ liệu, không gồm STT hoặc dòng tiêu đề. Thêm đủ trường trước khi dán. Dữ liệu được giữ dạng văn bản, không tự chuyển ngày hay bỏ số 0 đầu.
 3. Chọn / tạo kịch bản, mở Môi trường thao tác rồi **Học với bảng** ở chế độ chuột. Nếu dùng chế độ phím, nhấn phím Học đã gán (mặc định F8). Chờ đếm ngược xong.
-4. Nhấp đúp ô hoặc bấm **Sao chép ô** ở STT 1. Ứng dụng ghi một bước lấy trường, thu cửa sổ bảng để bạn quay về HIS, bấm đúng ô đích và dán. Dùng nút **Môi trường** trên bảng nổi để trở về lấy trường tiếp theo **cùng STT 1**. Các cú bấm / Ctrl+C trong bảng không bị lưu thành tọa độ; thao tác dán, chọn ô và xử lý bên HIS vẫn được học bình thường.
+4. Nhấp đúp ô hoặc bấm **Sao chép** ở STT 1. Ứng dụng ghi một bước lấy trường, thu cửa sổ bảng để bạn quay về HIS, bấm đúng ô đích và dán. Dùng nút **Môi trường** trên bảng nổi để trở về lấy trường tiếp theo **cùng STT 1**. Các cú bấm / Ctrl+C trong bảng không bị lưu thành tọa độ; thao tác dán, chọn ô và xử lý bên HIS vẫn được học bình thường.
 5. **Dừng học** trong tab, nút **Dừng** trên bảng nổi hoặc phím dừng theo chế độ để lưu. Chọn số lần chạy rồi Chạy: học ở STT 1 và chạy 7 lần sẽ lấy lần lượt STT 1–7. Nếu học bắt đầu STT 3 thì các vòng lấy STT 3, 4, 5…
 6. Kịch bản dùng bảng chọn **0 lần** sẽ chạy đến hàng cuối có dữ liệu rồi kết thúc. Các hàng trống hoàn toàn ở cuối được bỏ qua khi tính số hàng. Thiếu hàng, thiếu trường hoặc ô bắt buộc trống sẽ được báo **trước thao tác đầu tiên**; không dùng lại clipboard của hàng trước. Một kịch bản phải học tất cả trường từ cùng một STT để tránh trộn hàng.
 
-Bảng chia trang 12 hàng / 4 trường, không dùng thanh cuộn riêng. Nhấn Hàng trước / sau, Trường trước / sau để xem tiếp. Đang học chỉ sao chép, không sửa dữ liệu. Khi phát, bảng có thể đóng; ứng dụng dùng bản chụp dữ liệu cho lượt chạy đó.
+Chọn ô cần bắt đầu rồi **Ctrl+V** hoặc **Dán dữ liệu**. Ví dụ sao chép 10 tên, mỗi tên một dòng, chọn ô Họ và tên tại STT 1 rồi dán: dữ liệu điền lần lượt STT 1–10. Có thể dán một cột vào giữa bảng mà giữ các cột khác. Thanh cuộn dọc / con lăn để xem hàng, thanh ngang / Shift + con lăn để xem cột; không cần chuyển trang. Tiêu đề giữ nguyên khi cuộn dọc. Đang học chỉ sao chép, không sửa dữ liệu. Khi phát, bảng có thể đóng; ứng dụng dùng bản chụp dữ liệu cho lượt chạy đó.
+
+**Nhiều môi trường:** bấm **+ Tạo mới**, đặt tên rồi thêm trường / dán dữ liệu. Chọn bảng cũ bằng danh sách **Bảng**. Mỗi môi trường có dữ liệu riêng. Kịch bản đã học vẫn lấy bảng chứa các trường đã học dù bạn đang xem bảng khác; kịch bản chia sẻ từ máy khác sẽ ghép tên trường vào bảng đang chọn khi không có mã trường gốc. Khi học không chuyển bảng.
+
+**Quét chọn và xóa:** kéo chuột từ ô đầu đến ô cuối, Shift + bấm hoặc Shift + mũi tên để mở rộng vùng. Kéo ra mép bảng sẽ tự cuộn. Ctrl+A chọn toàn bộ dữ liệu; Ctrl+C sao chép vùng theo hàng / cột để dán ra Excel. Delete hoặc **Xóa vùng chọn** chỉ xóa nội dung, giữ STT và trường. **Làm trống bảng** xóa toàn bộ dữ liệu bảng đang chọn sau khi xác nhận, giữ cột để dán danh sách mới và giữ nguyên các bảng khác. Các thao tác tạo / đổi / xóa bị khóa khi học hoặc chạy.
 
 Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tính năng** ẩn tab và ngừng dùng công cụ, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong tab này.
 
-**Thoát toàn bộ** nằm cạnh Tính năng mở rộng trên menu và ở góc tab Tính năng mở rộng. Lệnh này dừng / lưu kịch bản, đóng công việc riêng và thoát hẳn. Nếu lưu thất bại sẽ báo lỗi thay vì báo đã lưu. Nút đóng [X] vẫn theo tùy chọn thu vào khay trong Cài đặt.
+**Thoát toàn bộ** là tab riêng cạnh **Tính năng mở rộng** trên thanh tab. Chọn tab này để thoát; menu cũng có cùng lệnh. Lệnh này dừng / lưu kịch bản, đóng công việc riêng và thoát hẳn. Nếu lưu thất bại sẽ báo lỗi thay vì báo đã lưu. Nút đóng [X] vẫn theo tùy chọn thu vào khay trong Cài đặt.
 
 Đã kiểm thử bằng dữ liệu mẫu và thao tác HIS mô phỏng, chưa xác minh đăng ký thực tế trên phần mềm HIS. Công cụ hỗ trợ nhập liệu theo kịch bản, không kết nối trực tiếp tới cơ sở dữ liệu HIS.
 
 ![Tính năng mở rộng](docs/images/extensions.png)
 
 ![Môi trường thao tác — dữ liệu mẫu](docs/images/his-environment.png)
+
+![Quét chọn nhiều ô](docs/images/his-selection.png)
 
 ![Học lấy dữ liệu từ bảng mẫu](docs/images/his-learning.png)
 

@@ -92,6 +92,52 @@ class HisDataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'không nhất quán'):self.model.prepare(conflicting,1)
 
 
+class MultipleEnvironmentTests(unittest.TestCase):
+    setUp=HisDataTests.setUp
+    copies=HisDataTests.copies
+    def test_create_switch_reload_and_play_uses_learned_table(self):
+        original=self.model.active_id;actions=self.copies()
+        self.model.create_environment('Bảng mới')
+        new=self.model.active_id;self.assertNotEqual(new,original);self.assertEqual(self.model.fields,[])
+        field=self.model.add_field('Họ và tên');self.model.set_cell(0,field,'Bảng thứ hai')
+        with self.assertRaisesRegex(ValueError,'nhiều môi trường'):
+            self.model.prepare(actions+[MacroAction('copy_field',0,data_field=field,data_row=1)],1)
+        loops,read=self.model.prepare(actions,3)
+        self.assertEqual(read(self.name,2),'Mẫu B')
+        self.model.select_environment(original)
+        self.assertEqual(self.model.rows[0][self.code],'00123')
+        self.model.update(rows=[{}])
+        self.model.select_environment(new);self.assertEqual(self.model.rows[0][field],'Bảng thứ hai')
+        loaded=HisEnvironment(self.model.path)
+        self.assertEqual(loaded.active_id,new);self.assertEqual(len(loaded.environments),2)
+        loaded.select_environment(original);self.assertEqual(loaded.rows,[{}]);self.assertEqual(len(loaded.fields),2)
+
+    def test_clear_range_preserves_other_cells_and_failed_save_preserves_all(self):
+        self.model.clear_cells(0,1,0,0)
+        self.assertNotIn(self.name,self.model.rows[0]);self.assertEqual(self.model.rows[1][self.code],'00456')
+        self.assertEqual(self.model.rows[2][self.name],'Mẫu C')
+        before=self.model.path.read_bytes();rows=self.model.rows
+        with patch.object(MacroStorage,'_atomic_json',side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):self.model.clear_cells(0,2,0,1)
+            with self.assertRaises(OSError):self.model.create_environment('Lỗi lưu')
+        self.assertIs(self.model.rows,rows);self.assertEqual(self.model.path.read_bytes(),before)
+        for args in ((-1,1,0,0),(0,1,0,9),(2,1,0,0)):
+            with self.assertRaises(ValueError):self.model.clear_cells(*args)
+
+    def test_old_file_migrates_without_losing_fields_or_rows(self):
+        import json
+        old=dict(installed=True,version=1,fields=self.model.fields,rows=self.model.rows)
+        self.model.path.write_text(json.dumps(old,ensure_ascii=False),encoding='utf-8')
+        loaded=HisEnvironment(self.model.path);self.assertFalse(loaded.error)
+        loaded.create_environment('Mới');loaded.select_environment('default')
+        self.assertEqual(loaded.rows[0][self.code],'00123')
+        self.assertEqual(json.loads(loaded.path.read_text())['version'],2)
+        before=loaded.path.read_bytes()
+        with patch.object(loaded,'MAX_BYTES',1):
+            with self.assertRaises(ValueError):loaded.set_cell(0,self.name,'Không được lưu')
+        self.assertEqual(loaded.path.read_bytes(),before)
+
+
 class RecorderFocusTests(unittest.TestCase):
     def test_ctrl_held_from_table_to_his_records_paste_with_balanced_keys(self):
         from pynput import keyboard
@@ -158,11 +204,11 @@ class HisUITests(unittest.TestCase):
         with patch.object(self.app,'_show_his_environment'):self.app._set_his_installed(True)
 
     def test_install_remove_reinstall_keeps_fields_and_rows(self):
-        self.assertEqual(len(self.app.tabs.tabs()),5)
-        self.install();self.assertEqual(len(self.app.tabs.tabs()),6)
+        self.assertEqual(len(self.app.tabs.tabs()),6)
+        self.install();self.assertEqual(len(self.app.tabs.tabs()),7)
         field=self.app.his.add_field('Họ và tên');self.app.his.set_cell(0,field,'Dữ liệu mẫu')
         self.app._set_his_installed(False)
-        self.assertIsNone(self.app.his_panel);self.assertEqual(len(self.app.tabs.tabs()),5)
+        self.assertIsNone(self.app.his_panel);self.assertEqual(len(self.app.tabs.tabs()),6)
         self.install()
         self.assertEqual(self.app.his.rows[0][field],'Dữ liệu mẫu')
         self.assertTrue(HisEnvironment(self.app.his.path).installed)
@@ -229,6 +275,108 @@ class HisUITests(unittest.TestCase):
             self.assertEqual(self.app.tabs.select(),str(self.app.his_tab))
             self.assertEqual(self.app.manager.state,MacroManager.STATE_RECORDING)
             self.app.manager.stop_recording()
+
+    def test_paste_ten_names_from_external_text_then_multiple_excel_columns(self):
+        self.install();name=self.app.his.add_field('Họ và tên');code=self.app.his.add_field('CCCD')
+        panel=self.app.his_panel;panel.refresh();panel.cell=(0,name)
+        text='\r\n'.join(f'Người mẫu {i}' for i in range(1,11))+'\r\n'
+        with patch.object(self.root,'clipboard_get',return_value=text):panel.paste()
+        self.assertEqual([row[name] for row in self.app.his.rows],[f'Người mẫu {i}' for i in range(1,11)])
+        self.assertIn('STT 1–10',panel.info.cget('text'))
+        panel.cell=panel.anchor=panel.extent=(8,name)
+        with patch.object(self.root,'clipboard_get',return_value='Tên mới 9\t00009\r\nTên mới 10\t00010\r\n'):panel.paste()
+        self.assertEqual(self.app.his.rows[9],{name:'Tên mới 10',code:'00010'})
+        panel.cell=panel.anchor=panel.extent=(1,code)
+        with patch.object(self.root,'clipboard_get',return_value='001\r002'):panel.paste()
+        self.assertEqual(self.app.his.rows[1][code],'001')
+        self.assertEqual(self.app.his.rows[2][name],'Người mẫu 3')
+
+    def test_scroll_large_sheet_and_select_edit_after_scrolling(self):
+        from types import SimpleNamespace
+        self.install();field=self.app.his.add_field('Họ và tên')
+        self.app.his.paste(0,0,[[f'Mẫu {i}'] for i in range(1,1001)])
+        panel=self.app.his_panel;panel.refresh();table=panel.table
+        table.yview('moveto',.5);self.assertGreater(table.start,450)
+        self.root.update_idletasks()
+        self.assertEqual(panel.vertical.get(),table.yview())
+        x=(table.edges[1]+table.edges[2])/2-table.canvasx(0)
+        panel.select_cell(SimpleNamespace(x=x,y=table.header_height+table.row_height/2))
+        row=table.start;self.assertEqual(panel.cell,(row,field))
+        panel.edit_or_copy();panel.editor[0].delete(0,'end');panel.editor[0].insert(0,'Đã sửa')
+        table.yview('scroll',1,'units')
+        self.assertIsNone(panel.editor);self.assertEqual(self.app.his.rows[row][field],'Đã sửa')
+        self.assertEqual(table.start,row+1)
+        table._wheel(SimpleNamespace(delta=-120));self.assertEqual(table.start,row+2)
+        table.yview('moveto',1);self.assertEqual(table.yview()[1],1)
+        self.assertLess(len(table.find_all()),300)
+        self.assertEqual(table.identify_row(table.header_height-1),'')
+        table.yview('moveto',0);self.assertEqual(table.start,0)
+
+    def test_horizontal_scroll_and_keyboard_keep_selected_field_visible(self):
+        from types import SimpleNamespace
+        self.install()
+        for i in range(10):self.app.his.add_field(f'Trường {i+1}')
+        panel=self.app.his_panel;panel.refresh();table=panel.table
+        with patch.object(table,'winfo_width',return_value=700):
+            table.draw();panel.cell=(0,self.app.his.fields[0]['id'])
+            for _ in range(9):panel.move_cell(0,1)
+            box=table.bbox('0',self.app.his.fields[-1]['id'])
+            self.assertTrue(box);self.assertGreaterEqual(box[0],0);self.assertLessEqual(box[0]+box[2],701)
+            self.assertEqual(table.identify_column(box[0]+10),'#11')
+            table._horizontal_wheel(SimpleNamespace(delta=120))
+
+    def test_exit_has_own_tab_and_invokes_full_shutdown(self):
+        labels=[self.app.tabs.tab(tab,'text') for tab in self.app.tabs.tabs()]
+        self.assertEqual(labels[labels.index('Tính năng mở rộng')+1],'Thoát toàn bộ')
+        self.root.update()
+        with patch.object(self.app,'_exit_app') as exit_app:
+            self.app.tabs.select(self.app.exit_tab);self.root.update()
+            exit_app.assert_called_once()
+
+    def test_drag_shift_select_copy_delete_and_select_all(self):
+        from types import SimpleNamespace
+        self.install();name=self.app.his.add_field('Họ và tên');code=self.app.his.add_field('CCCD')
+        self.app.his.paste(0,0,[['Mẫu 1','001'],['Mẫu 2','002'],['Mẫu 3','003']])
+        panel=self.app.his_panel;panel.refresh();table=panel.table
+        with patch.object(table,'winfo_width',return_value=700):
+            table.geometry_cells()
+            x=(table.edges[1]+table.edges[2])/2-table.canvasx(0)
+            panel.select_cell(SimpleNamespace(x=x,y=table.header_height+table.row_height/2,state=0))
+            x2=(table.edges[2]+table.edges[3])/2-table.canvasx(0)
+            panel.drag_select(SimpleNamespace(x=x2,y=table.header_height+table.row_height*1.5))
+            panel.end_drag();self.assertEqual(panel.selection_bounds(),(0,0,1,1))
+            with patch('extensions_ui.set_clipboard_text') as copy:panel.copy_cell()
+            copy.assert_called_once_with('Mẫu 1\t001\r\nMẫu 2\t002\r\n')
+            panel.clear_selection()
+            self.assertEqual(self.app.his.rows,[{},{},{name:'Mẫu 3',code:'003'}])
+            panel.select_all();self.assertEqual(panel.selection_bounds(),(0,0,2,1))
+            panel.clear_selection();self.assertEqual(self.app.his.rows,[{},{},{}])
+            panel.select_cell(SimpleNamespace(x=x,y=table.header_height+table.row_height/2,state=0))
+            panel.move_cell(1,1,extend=True);self.assertEqual(panel.selection_bounds(),(0,0,1,1))
+            panel.select_cell(SimpleNamespace(x=x2,y=table.header_height+table.row_height*2.5,state=1))
+            self.assertEqual(panel.selection_bounds(),(0,0,2,1))
+            panel.drag_select(SimpleNamespace(x=x2,y=table.header_height+table.row_height*table.page_rows+10))
+            self.assertIsNotNone(panel.drag_timer)
+            panel.end_drag();self.assertIsNone(panel.drag_timer)
+
+    def test_new_switch_and_clear_all_only_current_environment(self):
+        from extensions_ui import ThemedInputs,ThemedMessages
+        self.install();field=self.app.his.add_field('Tên');self.app.his.set_cell(0,field,'Giữ lại')
+        panel=self.app.his_panel;panel.refresh()
+        with patch.object(ThemedInputs,'askstring',return_value='Bảng 2'):panel.new_environment()
+        self.assertEqual(len(self.app.his.environments),2);self.assertEqual(self.app.his.fields,[])
+        second=self.app.his.add_field('Tên');self.app.his.set_cell(0,second,'Xóa thử');panel.refresh()
+        with patch.object(ThemedMessages,'askyesno',return_value=False):panel.clear_all()
+        self.assertEqual(self.app.his.rows[0][second],'Xóa thử')
+        with patch.object(ThemedMessages,'askyesno',return_value=True):panel.clear_all()
+        self.assertEqual(self.app.his.rows,[{}]);self.assertEqual(self.app.his.fields[0]['id'],second)
+        panel.environment_choice.current(0);panel.switch_environment()
+        self.assertEqual(self.app.his.rows[0][field],'Giữ lại')
+        self.app.manager.external_busy=True
+        with patch.object(ThemedInputs,'askstring') as ask,patch.object(ThemedMessages,'askyesno') as confirm:
+            panel.new_environment();panel.clear_all();panel.clear_selection();panel.select_all()
+            ask.assert_not_called();confirm.assert_not_called()
+        self.assertEqual(self.app.his.rows[0][field],'Giữ lại')
 
     def test_full_exit_preserves_private_learning_actions(self):
         engine=Mock();engine.recording=True;engine.thread.is_alive.return_value=False

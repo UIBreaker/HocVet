@@ -1,3 +1,36 @@
+# Học Vẹt v0.18.0
+
+- Thêm nhiều môi trường: + Tạo mới tạo bảng có tên riêng, danh sách Bảng chuyển giữa các môi trường; bảng cũ và trạng thái chọn lưu qua lần mở ứng dụng.
+- Tự chuyển bảng v0.17 sang cấu trúc nhiều môi trường, giữ trường, mã trường, dữ liệu và tham chiếu kịch bản. Kịch bản lấy đúng bảng đã học khi đang xem bảng khác; không cho trộn trường của nhiều bảng trong một kịch bản.
+- Quét vùng bằng kéo chuột, Shift + bấm / mũi tên, Ctrl+A. Tự cuộn khi kéo ra mép. Ctrl+C sao chép vùng dạng bảng, Ctrl+V dán từ góc trên trái vùng chọn.
+- Delete / Xóa vùng chọn chỉ xóa nội dung vùng đã chọn; Làm trống bảng hỏi xác nhận rồi xóa dữ liệu bảng hiện tại, giữ tên trường và các bảng khác. Khóa thay đổi dữ liệu / môi trường khi học hoặc chạy.
+- Lưu bằng thay thế file sau khi ghi thành công; khi lỗi lưu, giữ dữ liệu hiện có. Kiểm tra giới hạn tổng file 30 MB trước khi lưu để lần mở sau vẫn đọc được.
+- Kiểm thử di chuyển dữ liệu cũ, tạo / chuyển / mở lại bảng, chạy đúng nguồn, quét / sao chép / xóa vùng, hủy xác nhận và lỗi lưu. Chưa kiểm thử trực tiếp trên HIS thực tế.
+
+- Từ v0.17.0: bổ sung thanh cuộn dọc / ngang, Ctrl+V dán danh sách hoặc nhiều cột, và tab **Thoát toàn bộ** riêng.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Bảng v0.17 được chuyển sang cấu trúc nhiều môi trường, giữ trường, dữ liệu và tham chiếu kịch bản.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.18.0-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Mặc định dùng chuột: bấm **Dừng** trên bảng nổi. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**. Các giới hạn HIS trong README vẫn áp dụng; chưa xác minh trên HIS thực tế.
+
+---
+
+# Học Vẹt v0.17.1
+
+- Thay nút Hàng trước / sau và Trường trước / sau trong bảng HIS bằng thanh cuộn dọc / ngang. Hỗ trợ con lăn, Shift + con lăn, Page Up / Down và tự cuộn theo ô chọn bằng phím mũi tên; tiêu đề giữ nguyên khi cuộn dọc.
+- Chọn ô rồi Ctrl+V hoặc Dán dữ liệu để dán danh sách từ ngoài ứng dụng: mỗi dòng vào một STT, nhiều cột Excel vào các trường liên tiếp. Giữ nguyên tiếng Việt, số 0 đầu và dữ liệu các cột không dán; hiển thị số hàng và khoảng STT vừa dán.
+- Bảng chỉ vẽ các hàng đang xem để cuộn cả nghìn hàng mà không dựng toàn bộ bảng. Cuộn khi sửa ô sẽ lưu ô trước khi đổi vị trí.
+- Thoát toàn bộ thành tab riêng cạnh Tính năng mở rộng, chọn tab gọi lệnh dừng / lưu và thoát hẳn. Bỏ nút thoát khỏi nội dung trang Tính năng mở rộng.
+- Kiểm thử dán 10 tên, nhiều cột / vị trí bắt đầu, chọn / sửa sau khi cuộn bảng 1.000 hàng, cuộn ngang, bàn phím, và chọn tab thoát. Dữ liệu cũ và cách lấy STT theo vòng chạy được giữ nguyên.
+
+---
+
 # Học Vẹt v0.17.0
 
 - Thêm tab Tính năng mở rộng cạnh Cài đặt, công cụ Hỗ trợ ĐK KCB HIS cài / gỡ được. Cài xong có tab Môi trường thao tác; gỡ giữ lại bảng để cài lại.

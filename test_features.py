@@ -559,7 +559,7 @@ class UITest(unittest.TestCase):
 
     def test_tabs_speed_and_app_only_progress_notification(self):
         from tkinter import ttk
-        self.assertEqual(len(self.app.tabs.tabs()), 5)
+        self.assertEqual(len(self.app.tabs.tabs()), 6)
         self.app._cmd_open_settings()
         self.assertEqual(self.app.tabs.select(), str(self.app.settings_tab))
         def descendants(widget):

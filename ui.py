@@ -470,9 +470,10 @@ class HocVetApp:
         self.work_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
         self.settings_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
         self.extensions_tab = tk.Frame(self.tabs,bg=VINTAGE_BG)
+        self.exit_tab = tk.Frame(self.tabs,bg=VINTAGE_BG)
         for frame, label in ((self.content, 'Chính'), (self.details, 'Chi tiết / sửa bước'),
                              (self.work_tab, 'Công việc riêng'), (self.settings_tab, 'Cài đặt'),
-                             (self.extensions_tab,'Tính năng mở rộng')):
+                             (self.extensions_tab,'Tính năng mở rộng'),(self.exit_tab,'Thoát toàn bộ')):
             self.tabs.add(frame, text=label)
         self.tabs.bind('<<NotebookTabChanged>>', self._tab_changed)
         self._settings_built = False
@@ -593,6 +594,9 @@ class HocVetApp:
 
     def _tab_changed(self, event=None):
         selected = self.tabs.select()
+        if selected==str(self.exit_tab):
+            self._exit_app()
+            return
         editing = selected == str(self.settings_tab)
         if editing and (self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy):
             self.tabs.select(self.work_tab if self.manager.external_busy else self.content)
@@ -1743,10 +1747,12 @@ Cập nhật / thay file ứng dụng không xóa thư viện. File .bak giữ l
 14. Kéo tiêu đề bảng khi rảnh để đổi vị trí. Khi phát, chuột của kịch bản xuyên qua bảng tới cửa sổ bên dưới, không làm dừng kịch bản hoặc bấm các nút trên bảng. Ở chế độ chuột, chỉ cú bấm chuột thật vào Dừng mới dừng; ở chế độ phím dùng phím Dừng đã gán. Sau khi phát xong bảng nhận chuột trở lại.
 15. Dưới mỗi kịch bản trên bảng nổi có −/+, bấm vào số để nhập số lần lặp. 0 là lặp liên tục. Mỗi kịch bản giữ số riêng, tự lưu và đồng bộ với màn hình chính.
 16. Kéo cạnh / góc bảng nổi để đổi chiều rộng, chiều cao. Số kịch bản mỗi trang tự điều chỉnh; kích thước được ghi nhớ khi thả chuột. Chỉ chỉnh lặp / kích thước khi đã dừng để giữ vùng bấm xuyên bảng ổn định.
-17. Vào Tính năng mở rộng → Cài Hỗ trợ ĐK KCB HIS để mở tab Môi trường thao tác. Nhấn + ở tiêu đề để thêm trường; nhấp đúp ô để nhập, hoặc dán vùng dữ liệu Excel không gồm STT / tiêu đề. Bảng lưu văn bản để giữ số 0 đầu và định dạng ngày.
-18. Chọn Học với bảng (hoặc F8 ở chế độ phím). Khi đang học, nhấp đúp / Sao chép ô ở STT 1, quay về HIS và dán; bấm Môi trường ở bảng nổi để lấy trường tiếp theo cùng STT. Dừng để lưu rồi chọn số lần chạy: mỗi vòng lấy hàng tiếp theo. Ví dụ 7 vòng lấy STT 1–7. Với kịch bản dùng bảng, 0 vòng chạy đến hàng cuối có dữ liệu. Thiếu hàng / trường / ô trống sẽ được báo trước khi chạy.
+17. Vào Tính năng mở rộng → Cài Hỗ trợ ĐK KCB HIS để mở tab Môi trường thao tác. Nhấn + để thêm trường; chọn ô rồi Ctrl+V hoặc Dán dữ liệu. Mỗi dòng trong danh sách vào một STT: chọn ô Họ và tên ở STT 1, dán 10 tên sẽ điền STT 1–10. Dán nhiều cột từ Excel không gồm STT / tiêu đề. Bảng giữ số 0 đầu và định dạng ngày. Dùng thanh cuộn / con lăn xem hàng, thanh ngang / Shift + con lăn xem cột.
+18. Chọn Học với bảng (hoặc F8 ở chế độ phím). Khi đang học, nhấp đúp / Sao chép ở STT 1, quay về HIS và dán; bấm Môi trường ở bảng nổi để lấy trường tiếp theo cùng STT. Dừng để lưu rồi chọn số lần chạy: mỗi vòng lấy hàng tiếp theo. Ví dụ 7 vòng lấy STT 1–7. Với kịch bản dùng bảng, 0 vòng chạy đến hàng cuối có dữ liệu. Thiếu hàng / trường / ô trống sẽ được báo trước khi chạy.
 19. Gỡ công cụ sẽ ẩn tab nhưng giữ bảng để cài lại. Dữ liệu ở his_environment.json trong thư mục dữ liệu ứng dụng; kịch bản chia sẻ chỉ chứa tham chiếu trường, không chứa các hàng đã nhập. Máy nhận cần tạo trường cùng tên và nhập bảng riêng. Kịch bản cũ lấy tọa độ bảng cần học lại các bước lấy dữ liệu trong Môi trường thao tác.
-20. Thoát toàn bộ ở menu cạnh Tính năng mở rộng hoặc nút đỏ trong tab đó sẽ dừng / lưu rồi chờ các công việc đóng xong, thoát hẳn; không thu vào khay.
+20. Chọn tab Thoát toàn bộ cạnh Tính năng mở rộng để dừng / lưu, chờ các công việc đóng xong và thoát hẳn; không thu vào khay. Menu Thoát toàn bộ cũng dùng cùng lệnh này.
+21. Trong Môi trường thao tác, + Tạo mới tạo bảng riêng và giữ bảng cũ. Chọn bảng bằng danh sách Bảng. Kịch bản vẫn lấy đúng bảng chứa trường đã học dù đang xem bảng khác. Khi học hoặc chạy không đổi môi trường.
+22. Kéo chuột hoặc Shift + chọn để quét ô; Ctrl+A chọn tất cả, Ctrl+C sao chép vùng, Delete / Xóa vùng chọn xóa nội dung và giữ STT / trường. Làm trống bảng sẽ hỏi xác nhận, chỉ xóa dữ liệu bảng hiện tại, giữ cột và các bảng khác.
 
 Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; kiểm tra nội dung trước khi chia sẻ.
 """)
