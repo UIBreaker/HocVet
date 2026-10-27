@@ -10,4 +10,6 @@ dist/
 *.log
 scripts_library.json
 .venv/
+his_environment.json
+his_environment.json.bak
 

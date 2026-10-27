@@ -1,3 +1,35 @@
+# Học Vẹt v0.17.0
+
+- Thêm tab Tính năng mở rộng cạnh Cài đặt, công cụ Hỗ trợ ĐK KCB HIS cài / gỡ được. Cài xong có tab Môi trường thao tác; gỡ giữ lại bảng để cài lại.
+- Bảng ô có đường kẻ, STT tự động, + thêm trường, sửa ô, phím mũi tên, dán vùng dữ liệu từ Excel và phân trang hàng / trường. Giữ chuỗi văn bản, tiếng Việt và số 0 đầu.
+- Khi học lấy ô từ bảng, ghi bước lấy trường / STT thay cho tọa độ ô. Khi phát mỗi vòng lấy hàng kế tiếp, không cần mở lại bảng. Nút Môi trường trên bảng nổi cho phép quay về lấy trường tiếp theo khi đang học.
+- Ghi đúng Ctrl khi giữ từ thao tác sao chép trong bảng sang dán ở HIS, bỏ phím thao tác giao diện và giữ đủ sự kiện thả phím khi đổi cửa sổ.
+- Kiểm tra dữ liệu trước khi chạy: thiếu hàng / trường / ô trống hoặc học trộn STT sẽ bị chặn trước khi gửi thao tác. Chạy 0 lần với kịch bản dùng bảng sẽ dừng ở hàng dữ liệu cuối.
+- Bảng lưu riêng trong his_environment.json, giữ qua cập nhật. Bước lấy dữ liệu không nhúng các hàng vào kịch bản chia sẻ; máy nhận có thể tạo trường cùng tên và nhập bảng của mình. Các bước phím / ảnh khác vẫn cần kiểm tra nội dung trước khi chia sẻ.
+- Nút Thoát toàn bộ cạnh menu Tính năng mở rộng và trong tab công cụ: dừng / lưu, đóng công việc riêng, chờ luồng kết thúc rồi thoát hẳn. Khóa kích hoạt công việc mới khi đang thoát.
+- Kiểm thử mô phỏng ba vòng lấy đúng ba hàng; kiểm tra cài / gỡ / cài lại, dữ liệu sai / lỗi lưu, sao chép Unicode, bảo toàn số 0, chia sẻ tham chiếu và lưu công việc riêng khi thoát. Chưa thử đăng ký trên HIS thực tế.
+- Đóng gói theo thư mục dựng của phiên bản và đối chiếu mã trong EXE với nguồn trước khi tạo gói để tránh phát hành mã cũ từ bộ nhớ dựng.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Công cụ HIS cần được cài trong tab **Tính năng mở rộng**; bảng dữ liệu lưu riêng, không đi kèm file chia sẻ kịch bản.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.17.0-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Mặc định dùng chuột: bấm **Dừng** trên bảng nổi. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**. Các giới hạn HIS trong README vẫn áp dụng; chưa xác minh đăng ký trên HIS thực tế.
+
+---
+
+# Học Vẹt v0.16.1
+
+- Hiển thị rõ cả mười mốc 1×–10× trên thanh tốc độ; mức đang chọn được tô đỏ, số lớn cập nhật ngay khi kéo.
+- Làm rõ **Số lần chạy** (đơn vị lần) và **Nghỉ giữa các lần** (đơn vị giây), bổ sung nút tăng / giảm và hướng dẫn 0 lần là liên tục, 0 giây là chạy ngay vòng tiếp theo.
+- Giữ cách lưu và phát kịch bản, các mức tốc độ và dữ liệu đã có. Kiểm thử thang tốc độ, giá trị lặp / nghỉ và bố cục màn hình chính.
+
+---
+
 # Học Vẹt v0.16.0
 
 - Thêm bộ chỉnh số lần lặp cho từng kịch bản trên bảng nổi: −/+, bấm số để nhập trực tiếp, 0 là liên tục. Lưu riêng cho từng kịch bản, đồng bộ với màn hình chính và giữ số cũ nếu lưu thất bại.

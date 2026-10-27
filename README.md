@@ -1,20 +1,21 @@
-# Học Vẹt · v0.16.0
+# Học Vẹt · v0.17.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.16.0
+## Có gì mới trong 0.17.0
 
-- Chỉnh số lần lặp riêng cho từng kịch bản ngay trên bảng nổi bằng **− / +** hoặc bấm số để nhập; **0 = lặp liên tục**.
-- Kéo cạnh / góc để đổi kích thước bảng; số kịch bản mỗi trang tự điều chỉnh theo khung.
-- Ghi nhớ số lần lặp và kích thước qua lần mở / cập nhật; khóa chỉnh khi đang học / chạy.
+- Thêm **Tính năng mở rộng** và công cụ **Hỗ trợ ĐK KCB HIS** với bảng dữ liệu, STT tự động và dán từ Excel.
+- Học lấy dữ liệu theo trường, mỗi vòng dùng hàng kế tiếp; giữ tiếng Việt / số 0 đầu và kiểm tra dữ liệu trước khi chạy.
+- **Thoát toàn bộ** dừng, lưu và đóng hẳn ứng dụng.
+- Thanh tốc độ hiển thị đủ **1×–10×**; số lần chạy và khoảng nghỉ có đơn vị rõ ràng.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.16.0-Windows.zip** tại [bản phát hành 0.16.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.16.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.17.0-Windows.zip** tại [bản phát hành 0.17.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.17.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -109,9 +110,32 @@ Lưu qua file tạm rồi thay thế; `.bak` giữ lần lưu trước và đư�
 
 Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; kiểm tra trước khi chia sẻ. Chưa xác minh trên mọi phần mềm HIS / bộ gõ; thử kịch bản trên dữ liệu mẫu trước khi dùng thực tế.
 
+## Hỗ trợ ĐK KCB HIS (v0.17)
+
+1. Mở tab **Tính năng mở rộng** cạnh Cài đặt → **Cài đặt** công cụ **Hỗ trợ ĐK KCB HIS**. Tab **Môi trường thao tác** sẽ xuất hiện.
+2. Bấm **+** ở tiêu đề (hoặc **+ Trường dữ liệu**) để thêm Họ và tên, Ngày sinh, Giới tính, Địa chỉ, CCCD, SĐT… STT là số hàng tự động, không nhập / đổi thành trường khác. Nhấp đúp ô để nhập, Enter để lưu, Esc hủy; phím mũi tên để chuyển ô. Có thể chọn ô bắt đầu rồi **Dán bảng từ Excel**: chỉ chọn dữ liệu, không gồm STT hoặc dòng tiêu đề. Thêm đủ trường trước khi dán. Dữ liệu được giữ dạng văn bản, không tự chuyển ngày hay bỏ số 0 đầu.
+3. Chọn / tạo kịch bản, mở Môi trường thao tác rồi **Học với bảng** ở chế độ chuột. Nếu dùng chế độ phím, nhấn phím Học đã gán (mặc định F8). Chờ đếm ngược xong.
+4. Nhấp đúp ô hoặc bấm **Sao chép ô** ở STT 1. Ứng dụng ghi một bước lấy trường, thu cửa sổ bảng để bạn quay về HIS, bấm đúng ô đích và dán. Dùng nút **Môi trường** trên bảng nổi để trở về lấy trường tiếp theo **cùng STT 1**. Các cú bấm / Ctrl+C trong bảng không bị lưu thành tọa độ; thao tác dán, chọn ô và xử lý bên HIS vẫn được học bình thường.
+5. **Dừng học** trong tab, nút **Dừng** trên bảng nổi hoặc phím dừng theo chế độ để lưu. Chọn số lần chạy rồi Chạy: học ở STT 1 và chạy 7 lần sẽ lấy lần lượt STT 1–7. Nếu học bắt đầu STT 3 thì các vòng lấy STT 3, 4, 5…
+6. Kịch bản dùng bảng chọn **0 lần** sẽ chạy đến hàng cuối có dữ liệu rồi kết thúc. Các hàng trống hoàn toàn ở cuối được bỏ qua khi tính số hàng. Thiếu hàng, thiếu trường hoặc ô bắt buộc trống sẽ được báo **trước thao tác đầu tiên**; không dùng lại clipboard của hàng trước. Một kịch bản phải học tất cả trường từ cùng một STT để tránh trộn hàng.
+
+Bảng chia trang 12 hàng / 4 trường, không dùng thanh cuộn riêng. Nhấn Hàng trước / sau, Trường trước / sau để xem tiếp. Đang học chỉ sao chép, không sửa dữ liệu. Khi phát, bảng có thể đóng; ứng dụng dùng bản chụp dữ liệu cho lượt chạy đó.
+
+Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tính năng** ẩn tab và ngừng dùng công cụ, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong tab này.
+
+**Thoát toàn bộ** nằm cạnh Tính năng mở rộng trên menu và ở góc tab Tính năng mở rộng. Lệnh này dừng / lưu kịch bản, đóng công việc riêng và thoát hẳn. Nếu lưu thất bại sẽ báo lỗi thay vì báo đã lưu. Nút đóng [X] vẫn theo tùy chọn thu vào khay trong Cài đặt.
+
+Đã kiểm thử bằng dữ liệu mẫu và thao tác HIS mô phỏng, chưa xác minh đăng ký thực tế trên phần mềm HIS. Công cụ hỗ trợ nhập liệu theo kịch bản, không kết nối trực tiếp tới cơ sở dữ liệu HIS.
+
+![Tính năng mở rộng](docs/images/extensions.png)
+
+![Môi trường thao tác — dữ liệu mẫu](docs/images/his-environment.png)
+
+![Học lấy dữ liệu từ bảng mẫu](docs/images/his-learning.png)
+
 ## Công việc riêng (v0.14)
 
-Bốn tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt** không có thanh cuộn. Chi tiết chia 12 bước/trang, cài đặt chia 6 lệnh/trang. Thanh tốc độ hỗ trợ mọi mức nguyên từ **1× đến 10×**. Chỉ dùng thông báo nổi của Học Vẹt, có thanh tiến độ khi chạy; không gửi thông báo Windows.
+Các tab **Chính**, **Chi tiết / sửa bước**, **Công việc riêng**, **Cài đặt**, **Tính năng mở rộng** không có thanh cuộn. Chi tiết chia 12 bước/trang, cài đặt chia 6 lệnh/trang. Thanh tốc độ hỗ trợ mọi mức nguyên từ **1× đến 10×**. Chỉ dùng thông báo nổi của Học Vẹt, có thanh tiến độ khi chạy; không gửi thông báo Windows.
 
 Trong **Công việc riêng**, chọn loại phiên rồi bấm **Mở phiên**. Ở chế độ chuột, bấm **Học trong tab**, thao tác trên ảnh xem trước bằng chuột đỏ, nhập tiếng Việt ở ô **Nhập chữ** rồi **Gửi vào phiên**. **Dừng** sẽ tự lưu; chọn **Chạy công việc** để phát lại. Có thể đổi tab, dùng ứng dụng khác hoặc thu Học Vẹt vào khay trong lúc chạy. Ở chế độ phím, các nút Học / Chạy / Dừng bị khóa bằng chuột; gán phím tương ứng trong Cài đặt để sử dụng. Phím Dừng học / Khẩn cấp cũng dừng công việc riêng khi đang ở chế độ phím.
 
@@ -140,7 +164,7 @@ Kiểm thử:
 
 ```powershell
 python test_core.py
-python -m unittest -v test_features test_theme test_workspace test_overlay_input
+python -m unittest -v test_features test_theme test_workspace test_overlay_input test_his
 ```
 
 Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên qua bảng nổi (cần Microsoft Edge; bài kiểm thử bảng nổi dùng chuột thật trên cửa sổ mẫu rồi trả lại vị trí cũ):

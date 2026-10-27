@@ -108,6 +108,7 @@ class WorkspacePanel:
             self.engine = WorkspaceEngine(folder, lambda event, data: self.app._post(self._event, event, data))
 
     def _available(self):
+        if self.app._closing:return False
         if self.app.manager.state != self.app.manager.STATE_IDLE:
             self.app.notify_app('Hãy dừng kịch bản màn hình trước', 'Không chạy đồng thời hai chế độ nhập liệu.')
             return False
@@ -337,3 +338,15 @@ class WorkspacePanel:
 
     def close(self):
         if self.engine: self.engine.close()
+
+    def save_on_exit(self):
+        if not self.engine or not self.engine.actions:return
+        if getattr(self,'_library_unreadable',False):
+            raise ValueError('Không thể ghi đè thư viện công việc bị hỏng. Hãy khôi phục bản dự phòng.')
+        self.engine.recording=False
+        self.actions=[dict(action) for action in self.engine.actions]
+        data=self._data()
+        from core import MacroStorage
+        library=dict(self.library);library[data['name']]=data
+        MacroStorage._atomic_json(library,self.library_path)
+        self.library=library

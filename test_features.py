@@ -356,6 +356,23 @@ class FeaturesTest(unittest.TestCase):
 
 
 class UITest(unittest.TestCase):
+    def test_speed_scale_marks_every_level_and_repeat_inputs_keep_values(self):
+        from types import SimpleNamespace
+        slider=self.app.speed_slider
+        self.root.update_idletasks()
+        labels=[slider.itemcget(item,'text') for item in slider.find_withtag('speed_tick_label')]
+        self.assertEqual(labels,[f'{n}×' for n in range(1,11)])
+        with patch.object(slider,'winfo_width',return_value=600):
+            slider.set(1.5)
+            thumb=slider.coords(slider.find_withtag('speed_thumb')[0])
+            self.assertAlmostEqual((thumb[0]+thumb[2])/2,24+552/18)
+            slider._drag(SimpleNamespace(x=576))
+        self.assertEqual(self.app.speed_readout.cget('text'),'10×')
+        self.app.loop_count_var.set('0')
+        self.app.loop_delay_var.set('2.5')
+        self.assertEqual(self.app._parse_loop_count(),0)
+        self.assertEqual(self.app._parse_loop_delay(),2.5)
+
     def test_panel_repeat_number_opens_visible_editor_with_hidden_main(self):
         import tkinter as tk
         from tkinter import ttk
@@ -542,7 +559,7 @@ class UITest(unittest.TestCase):
 
     def test_tabs_speed_and_app_only_progress_notification(self):
         from tkinter import ttk
-        self.assertEqual(len(self.app.tabs.tabs()), 4)
+        self.assertEqual(len(self.app.tabs.tabs()), 5)
         self.app._cmd_open_settings()
         self.assertEqual(self.app.tabs.select(), str(self.app.settings_tab))
         def descendants(widget):

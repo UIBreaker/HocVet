@@ -27,6 +27,7 @@ from typing import List, Dict, Any, Optional, Callable
 from pynput import mouse, keyboard
 from app_info import APP_VERSION
 from conditions import condition_check, decode_reference
+from clipboard_text import set_clipboard_text
 from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity, hotkey_identities
 
 
@@ -118,6 +119,9 @@ class MacroAction:
     image: Optional[str] = None      # PNG base64 nằm trong kịch bản để chia sẻ cùng file.
     timeout: float = 30.0
     tolerance: float = 0.02
+    data_field: Optional[str] = None
+    data_label: Optional[str] = None
+    data_row: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         # Các trường là giá trị vô hướng; tránh deepcopy từng bước khi lưu kịch bản dài.
@@ -139,6 +143,9 @@ class MacroAction:
             image=data.get('image'),
             timeout=float(data.get('timeout', 30)),
             tolerance=float(data.get('tolerance', 0.02)),
+            data_field=data.get('data_field'),
+            data_label=data.get('data_label'),
+            data_row=data.get('data_row'),
         )
 
 
@@ -207,6 +214,8 @@ class MacroRecorder:
         self.ignore_keyboard: Optional[Callable[[], bool]] = None
         self._pressed_keys = set()
         self._ignored_releases = set()
+        self._own_modifiers = {}
+        self._captured_modifiers = set()
 
         # Callback khi có action mới
         self.on_action_recorded: Optional[Callable[[MacroAction, int], None]] = None
@@ -245,6 +254,10 @@ class MacroRecorder:
             pressed=pressed,
         )
         self._add_action(action)
+
+    def record_field(self, field_id, label, row):
+        if self.is_recording:
+            self._add_action(MacroAction('copy_field',self._get_delay(),data_field=field_id,data_label=label,data_row=row))
 
     def _on_mouse_scroll(self, x: int, y: int, dx: int, dy: int):
         if not self.is_recording:
@@ -287,6 +300,9 @@ class MacroRecorder:
         matched = next((combo for combo in self._control_combinations if combo <= self._pressed_keys), None)
         if matched:
             self._ignored_releases.update(matched)
+            for name in matched:
+                self._own_modifiers.pop(name, None)
+                self._captured_modifiers.discard(name)
             # Không lưu Ctrl/Alt/Shift vừa bấm để dừng ghi vào cuối kịch bản.
             with self._lock:
                 while self.actions and self.actions[-1].action_type == 'key_press' and \
@@ -294,7 +310,21 @@ class MacroRecorder:
                     self.actions.pop()
             return
         if self.ignore_keyboard and self.ignore_keyboard():
+            if identity not in self._captured_modifiers:
+                self._ignored_releases.add(identity)
+                if identity in {'ctrl', 'alt', 'shift', 'cmd'}:
+                    self._own_modifiers[identity] = key
             return
+        # Ctrl có thể được giữ từ ô dữ liệu sang cửa sổ cần dán.
+        for name, held in list(self._own_modifiers.items()):
+            self._own_modifiers.pop(name, None)
+            if name in self._pressed_keys and name != identity:
+                self._ignored_releases.discard(name)
+                self._captured_modifiers.add(name)
+                self._add_action(MacroAction('key_press', self._get_delay(), key=key_to_str(held)))
+        self._ignored_releases.discard(identity)
+        if identity in {'ctrl', 'alt', 'shift', 'cmd'}:
+            self._captured_modifiers.add(identity)
         delay = self._get_delay()
         action = MacroAction(
             action_type="key_press",
@@ -308,10 +338,13 @@ class MacroRecorder:
             return
         identity = key_identity(key)
         self._pressed_keys.discard(identity)
+        self._own_modifiers.pop(identity, None)
+        captured = identity in self._captured_modifiers
+        self._captured_modifiers.discard(identity)
         if identity in self._ignored_releases:
             self._ignored_releases.discard(identity)
             return
-        if self.ignore_keyboard and self.ignore_keyboard():
+        if not captured and self.ignore_keyboard and self.ignore_keyboard():
             return
         delay = self._get_delay()
         action = MacroAction(
@@ -332,6 +365,8 @@ class MacroRecorder:
             self.actions = []
             self._pressed_keys.clear()
             self._ignored_releases.clear()
+            self._own_modifiers.clear()
+            self._captured_modifiers.clear()
             self.is_recording = True
             self._last_time = time.perf_counter()
 
@@ -393,6 +428,9 @@ class MacroPlayer:
         self.protect_mouse = None
         self.protect_keyboard = None
         self.on_input_finished = None
+        self.field_reader = None
+        self.current_loop = 1
+        self.data_start_row = None
         self._held_buttons = set()
 
     def is_running(self) -> bool:
@@ -439,6 +477,7 @@ class MacroPlayer:
     ):
         if self.is_playing:
             return
+        self.data_start_row=next((action.data_row for action in actions if action.action_type=='copy_field'),None)
         self._abort_event.clear()
         self.last_error = ''
         self.is_playing = True
@@ -465,6 +504,7 @@ class MacroPlayer:
 
         try:
             while not self._abort_event.is_set():
+                self.current_loop = current_loop
                 for idx, action in enumerate(actions, start=1):
                     if self._abort_event.is_set():
                         aborted = True
@@ -507,6 +547,7 @@ class MacroPlayer:
                 except Exception as error:
                     self.last_error = str(error)
                     aborted = True
+            self.field_reader = None
             self.is_playing = False
             if not aborted:
                 play_sound("stop_play")
@@ -522,7 +563,11 @@ class MacroPlayer:
         if act_type in ('key_press', 'key_release') and self.protect_keyboard and self.protect_keyboard():
             raise RuntimeError('Học Vẹt đang nhận bàn phím. Đã dừng để bảo vệ bảng điều khiển; chọn lại cửa sổ công việc rồi chạy.')
 
-        if act_type in ('wait_window', 'wait_image'):
+        if act_type == 'copy_field':
+            if not self.field_reader: raise RuntimeError('Chưa có bảng dữ liệu cho kịch bản HIS.')
+            value=self.field_reader(action.data_field,action.data_row+self.current_loop-1)
+            set_clipboard_text(value,self._abort_event)
+        elif act_type in ('wait_window', 'wait_image'):
             if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
                 raise ValueError('Thời gian chờ phải từ 0 đến 3600 giây.')
             check = condition_check(action)
@@ -623,7 +668,7 @@ class MacroStorage:
 
     @staticmethod
     def validate_profile(profile):
-        allowed = {'mouse_click', 'mouse_move', 'mouse_scroll', 'key_press', 'key_release',
+        allowed = {'mouse_click', 'mouse_move', 'mouse_scroll', 'key_press', 'key_release', 'copy_field',
                    'wait_window', 'wait_image'}
         if not profile.name or len(profile.actions) > 100000:
             raise ValueError('Tên kịch bản trống hoặc quá nhiều bước.')
@@ -637,6 +682,11 @@ class MacroStorage:
         for action in profile.actions:
             if action.action_type not in allowed or not math.isfinite(action.delay) or action.delay < 0:
                 raise ValueError('Loại thao tác hoặc độ trễ không hợp lệ.')
+            if action.action_type=='copy_field':
+                if not isinstance(action.data_field,str) or not 1<=len(action.data_field)<=80 or type(action.data_row) is not int or not 1<=action.data_row<=10000:
+                    raise ValueError('Tham chiếu ô dữ liệu không hợp lệ.')
+                if action.data_label is not None and (not isinstance(action.data_label,str) or len(action.data_label)>100):
+                    raise ValueError('Tên trường dữ liệu không hợp lệ.')
             if action.action_type.startswith('key_'):
                 if not isinstance(action.key, str) or not action.key or str_to_key(action.key) is None:
                     raise ValueError('Phím trong kịch bản không hợp lệ.')
@@ -808,6 +858,7 @@ class MacroManager:
         self.on_panic = None
         self.shortcuts_suspended = False
         self.external_busy = False
+        self.prepare_field_data = None
         self.button_hotkey_scopes = {name: 'global' if name in ('show', 'stop_record') else 'app'
                                      for name in self.button_hotkeys if SHORTCUT_ACTIONS[name][2] != 'dialog'}
 
@@ -1070,11 +1121,17 @@ class MacroManager:
     def start_playing_profile(self, profile: ScriptProfile):
         if self.external_busy or self.state != self.STATE_IDLE or not profile.actions:
             return
+        loops=profile.loop_count
+        reader=None
+        if any(action.action_type=='copy_field' for action in profile.actions):
+            if not self.prepare_field_data: raise ValueError('Cần cài Hỗ trợ ĐK KCB HIS và nạp bảng dữ liệu trước khi chạy.')
+            loops,reader=self.prepare_field_data(profile.actions,loops)
+        self.player.field_reader=reader
         self._set_state(self.STATE_PLAYING)
         self.player.play_async(
             profile.actions,
             speed=profile.speed,
-            loop_count=profile.loop_count,
+            loop_count=loops,
             loop_delay=profile.loop_delay,
         )
 

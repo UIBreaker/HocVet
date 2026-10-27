@@ -25,6 +25,8 @@ class RecordNotice:
         self._layout_timer = None
         self._row_height = self._chrome_height = None
         self._resizing = False
+        self.environment_enabled = False
+        self.on_environment = None
 
     def pin(self, profiles, on_run, on_stop, on_open, activation='mouse', *, on_repeat=None, size=None, on_resize=None):
         self.pinned = True
@@ -45,6 +47,11 @@ class RecordNotice:
         if self.busy != busy:
             self.busy = busy
             if self.pinned and self.launcher: self._render_profiles()
+
+    def set_environment_enabled(self, enabled):
+        if self.environment_enabled != enabled:
+            self.environment_enabled=enabled
+            if self.pinned and self.launcher:self._render_profiles()
 
     def _render_profiles(self):
         for child in self.launcher.winfo_children(): child.destroy()
@@ -99,8 +106,9 @@ class RecordNotice:
             state='normal' if self.page+1 < pages and not self.busy else 'disabled').pack(side='right')
         footer = ttk.Frame(self.launcher)
         footer.pack(fill='x')
-        ttk.Button(footer, text='Mở ứng dụng', takefocus=False, command=lambda:self.on_open(),
-            state='disabled' if self.busy else 'normal').pack(side='left')
+        ttk.Button(footer, text='Môi trường' if self.environment_enabled else 'Mở ứng dụng', takefocus=False,
+            command=lambda:self.on_environment() if self.environment_enabled and self.on_environment else self.on_open(),
+            state='normal' if self.environment_enabled or not self.busy else 'disabled').pack(side='left')
         self.stop_button = ttk.Button(footer, text='■ Dừng', style='Danger.TButton', takefocus=False,
             command=lambda:self.on_stop() if self.activation=='mouse' else None,
             state='normal' if self.busy and self.activation=='mouse' else 'disabled')
