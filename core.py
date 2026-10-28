@@ -216,6 +216,7 @@ class MacroRecorder:
         self._ignored_releases = set()
         self._own_modifiers = {}
         self._captured_modifiers = set()
+        self.ignore_key_event = lambda msg,data:False
 
         # Callback khi có action mới
         self.on_action_recorded: Optional[Callable[[MacroAction, int], None]] = None
@@ -258,6 +259,10 @@ class MacroRecorder:
     def record_field(self, field_id, label, row):
         if self.is_recording:
             self._add_action(MacroAction('copy_field',self._get_delay(),data_field=field_id,data_label=label,data_row=row))
+
+    def record_date_field(self,field_id,label,row):
+        if self.is_recording:
+            self._add_action(MacroAction('paste_date',self._get_delay(),data_field=field_id,data_label=label,data_row=row))
 
     def _on_mouse_scroll(self, x: int, y: int, dx: int, dy: int):
         if not self.is_recording:
@@ -380,7 +385,7 @@ class MacroRecorder:
         self._keyboard_listener = keyboard.Listener(
             on_press=self._on_key_press,
             on_release=self._on_key_release,
-            win32_event_filter=self._filter_keyboard_event,
+            win32_event_filter=lambda msg,data:self._filter_keyboard_event(msg,data) and not self.ignore_key_event(msg,data),
         )
         self._mouse_listener.daemon = True
         self._keyboard_listener.daemon = True
@@ -478,7 +483,7 @@ class MacroPlayer:
     ):
         if self.is_playing:
             return
-        self.data_start_row=next((action.data_row for action in actions if action.action_type=='copy_field'),None)
+        self.data_start_row=next((action.data_row for action in actions if action.action_type in ('copy_field','paste_date')),None)
         self._abort_event.clear()
         self.last_error = ''
         self.is_playing = True
@@ -561,13 +566,19 @@ class MacroPlayer:
             point = (action.x, action.y) if action.x is not None and action.y is not None else self.mouse_controller.position
             if self.protect_mouse(*point):
                 raise RuntimeError('Tọa độ kịch bản chạm bảng Học Vẹt. Đã dừng trước thao tác; kéo bảng sang vị trí khác rồi chạy lại.')
-        if act_type in ('key_press', 'key_release') and self.protect_keyboard and self.protect_keyboard():
+        if act_type in ('key_press', 'key_release','paste_date') and self.protect_keyboard and self.protect_keyboard():
             raise RuntimeError('Học Vẹt đang nhận bàn phím. Đã dừng để bảo vệ bảng điều khiển; chọn lại cửa sổ công việc rồi chạy.')
 
-        if act_type == 'copy_field':
+        if act_type in ('copy_field','paste_date'):
             if not self.field_reader: raise RuntimeError('Chưa có bảng dữ liệu cho kịch bản HIS.')
             value=self.field_reader(action.data_field,action.data_row+self.current_loop-1)
-            set_clipboard_text(value,self._abort_event)
+            if act_type=='paste_date':
+                from date_paste import paste_date
+                # Ctrl vật lý có thể đã được ghi trước bước dán ngày.
+                for key in (keyboard.Key.ctrl_l,keyboard.Key.ctrl_r):
+                    self.keyboard_controller.release(key)
+                paste_date(value,self.keyboard_controller,self._abort_event,self.protect_keyboard)
+            else:set_clipboard_text(value,self._abort_event)
             if self.on_field_copied:
                 self.on_field_copied(getattr(self.field_reader,'environment_id',None),
                     getattr(self.field_reader,'field_ids',{}).get(action.data_field,action.data_field),action.data_row+self.current_loop-1)
@@ -672,7 +683,7 @@ class MacroStorage:
 
     @staticmethod
     def validate_profile(profile):
-        allowed = {'mouse_click', 'mouse_move', 'mouse_scroll', 'key_press', 'key_release', 'copy_field',
+        allowed = {'mouse_click', 'mouse_move', 'mouse_scroll', 'key_press', 'key_release', 'copy_field', 'paste_date',
                    'wait_window', 'wait_image'}
         if not profile.name or len(profile.actions) > 100000:
             raise ValueError('Tên kịch bản trống hoặc quá nhiều bước.')
@@ -686,7 +697,7 @@ class MacroStorage:
         for action in profile.actions:
             if action.action_type not in allowed or not math.isfinite(action.delay) or action.delay < 0:
                 raise ValueError('Loại thao tác hoặc độ trễ không hợp lệ.')
-            if action.action_type=='copy_field':
+            if action.action_type in ('copy_field','paste_date'):
                 if not isinstance(action.data_field,str) or not 1<=len(action.data_field)<=80 or type(action.data_row) is not int or not 1<=action.data_row<=10000:
                     raise ValueError('Tham chiếu ô dữ liệu không hợp lệ.')
                 if action.data_label is not None and (not isinstance(action.data_label,str) or len(action.data_label)>100):
@@ -1127,7 +1138,7 @@ class MacroManager:
             return
         loops=profile.loop_count
         reader=None
-        if any(action.action_type=='copy_field' for action in profile.actions):
+        if any(action.action_type in ('copy_field','paste_date') for action in profile.actions):
             if not self.prepare_field_data: raise ValueError('Cần cài Hỗ trợ ĐK KCB HIS và nạp bảng dữ liệu trước khi chạy.')
             loops,reader=self.prepare_field_data(profile.actions,loops)
         self.player.field_reader=reader

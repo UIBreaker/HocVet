@@ -101,7 +101,7 @@ class SheetGrid(tk.Canvas):
     def draw(self):
         self.delete('all');self.geometry_cells()
         self.configure(scrollregion=(0,0,self.edges[-1]+1,self.winfo_height()))
-        headings=['STT']+[field['name'] for field in self.fields]+['+']
+        headings=['STT']+[field['name']+(' · Ngày → 3 ô' if field.get('paste_mode')=='date_dmy' else '') for field in self.fields]+['+']
         for column,heading in enumerate(headings):
             left,right=self.edges[column:column+2]
             self.create_rectangle(left,1,right,self.header_height,fill='#e7dfce',outline='#b9b0a1')
@@ -113,7 +113,7 @@ class SheetGrid(tk.Canvas):
                 left,right=self.edges[column:column+2]
                 field=self.fields[column-1]['id'] if 1<=column<=len(self.fields) else None
                 selected=field is not None and (self.selected==(row,field) or self.selection is not None and self.selection[0]<=row<=self.selection[2] and self.selection[1]<=column-1<=self.selection[3])
-                color='#dfeef6' if selected else '#f5f1e5' if column==0 or row>=self.max_rows else '#fffdf8'
+                color='#dfeef6' if selected else '#e7dfce' if column==0 or row>=self.max_rows else '#fffdf8' if row%2==0 else '#f3f5f7'
                 if field and (row,field) in self.processed:color='#dfedd6'
                 if field and self.current_copy==(row,field):color='#ffe2a0'
                 self.create_rectangle(left,top,right,top+self.row_height,fill=color,outline='#d7d0c1')

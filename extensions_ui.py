@@ -73,15 +73,24 @@ class HisPanel:
         self.stop.pack(side='right',padx=8)
         self.instructions=ttk.Label(parent,text='Nhấn + ở tiêu đề để thêm trường. Nhấp đúp ô để nhập; dán vùng Excel không gồm STT / tiêu đề.',wraplength=700)
         self.instructions.pack(fill='x',padx=14,pady=(0,6))
-        environments=ttk.Frame(parent,padding=(12,4));environments.pack(fill='x')
-        ttk.Label(environments,text='Bảng:').pack(side='left',padx=(0,6))
-        self.environment_choice=ttk.Combobox(environments,state='readonly',width=26)
+        environments=ttk.LabelFrame(parent,text='Bảng dữ liệu đang thao tác',padding=(10,8));environments.pack(fill='x',padx=12,pady=4)
+        self.environment_choice=ttk.Combobox(environments,state='readonly',width=26,font=('Segoe UI',11))
         self.environment_choice.pack(side='left',fill='x',expand=True)
         self.environment_choice.bind('<<ComboboxSelected>>',self.switch_environment)
         self.new_button=ttk.Button(environments,text='+ Tạo mới',command=self.new_environment)
         self.new_button.pack(side='left',padx=6)
-        self.clear_all_button=ttk.Button(environments,text='Làm trống bảng',style='Danger.TButton',command=self.clear_all)
+        self.remove_environment_button=ttk.Button(environments,text='Xóa bảng',style='Danger.TButton',command=self.delete_environment)
+        self.remove_environment_button.pack(side='right',padx=(6,0))
+        self.clear_all_button=ttk.Button(environments,text='Làm trống dữ liệu',command=self.clear_all)
         self.clear_all_button.pack(side='right')
+        self.environment_summary=ttk.Label(parent,wraplength=700)
+        self.environment_summary.pack(fill='x',padx=16,pady=(0,4))
+        mode_row=ttk.Frame(parent,padding=(12,2));mode_row.pack(fill='x')
+        self.paste_mode_label=ttk.Label(mode_row,text='Chọn cột để xem kiểu dán:',wraplength=300)
+        self.paste_mode_label.pack(side='left',padx=(0,8))
+        self.paste_mode_choice=ttk.Combobox(mode_row,state='disabled',width=32,values=['Văn bản → 1 ô','Ngày / tháng / năm → 3 ô HIS'])
+        self.paste_mode_choice.pack(side='left')
+        self.paste_mode_choice.bind('<<ComboboxSelected>>',lambda event:self.set_paste_mode('date_dmy' if self.paste_mode_choice.current()==1 else 'text'))
         controls=ttk.Frame(parent,padding=(12,4));controls.pack(fill='x')
         self.add_field_button=ttk.Menubutton(controls,text='Trường dữ liệu ▾');self.add_field_button.pack(side='left')
         self.field_menu=tk.Menu(self.add_field_button,tearoff=False,postcommand=self.update_field_menu)
@@ -89,6 +98,9 @@ class HisPanel:
         for text,command in (('+ Thêm trường',self.add_field),('Đổi tên trường',self.rename_field),('Chuyển sang trái',lambda:self.move_field(-1)),
                              ('Chuyển sang phải',lambda:self.move_field(1)),('Xóa trường dữ liệu',self.delete_field)):
             self.field_menu.add_command(label=text,command=command)
+        self.field_menu.add_separator()
+        self.field_menu.add_command(label='Kiểu dán: văn bản một ô',command=lambda:self.set_paste_mode('text'))
+        self.field_menu.add_command(label='Kiểu dán: ngày → 3 ô HIS (dd/mm/yyyy)',command=lambda:self.set_paste_mode('date_dmy'))
         self.add_row_button=ttk.Button(controls,text='+ Hàng',command=self.add_row);self.add_row_button.pack(side='left',padx=6)
         self.paste_button=ttk.Button(controls,text='Dán dữ liệu · Ctrl+V',command=self.paste);self.paste_button.pack(side='left')
         self.copy_button=ttk.Button(controls,text='Sao chép',style='Info.TButton',command=self.copy_cell);self.copy_button.pack(side='right')
@@ -129,11 +141,11 @@ class HisPanel:
         self.refresh();self.sync_state()
 
     def idle(self):
-        return not self.app._closing and self.app.manager.state==self.app.manager.STATE_IDLE and not self.app.manager.external_busy and self.app._pending_play is None
+        return not self.app._closing and not self.app.date_paste.busy and self.app.manager.state==self.app.manager.STATE_IDLE and not self.app.manager.external_busy and self.app._pending_play is None
 
     def sync_state(self):
         idle=self.idle()
-        for button in (self.add_field_button,self.add_row_button,self.paste_button,self.new_button,self.clear_all_button,self.delete_button):button.configure(state='normal' if idle else 'disabled')
+        for button in (self.add_field_button,self.add_row_button,self.paste_button,self.new_button,self.clear_all_button,self.delete_button,self.remove_environment_button):button.configure(state='normal' if idle else 'disabled')
         self.environment_choice.configure(state='readonly' if idle else 'disabled')
         learning=self.app.manager.state==self.app.manager.STATE_RECORDING
         countdown=self.app.manager.state==self.app.manager.STATE_COUNTDOWN
@@ -143,15 +155,26 @@ class HisPanel:
         self.instructions.configure(text='ĐANG HỌC: nhấp đúp hoặc Sao chép ô → quay về HIS dán. Bấm Môi trường ở bảng nổi để lấy trường tiếp theo.' if learning else
             'Chọn ô rồi Ctrl+V để dán danh sách: mỗi dòng vào một STT. Nhấp đúp để sửa. Dán từ Excel không gồm STT / tiêu đề.')
         if countdown:self.instructions.configure(text=f'SẴN SÀNG HỌC SAU {self.countdown_seconds} GIÂY · Bấm Dừng học để hủy, chưa ghi thao tác.')
+        self.sync_paste_mode()
+
+    def sync_paste_mode(self):
+        field=self.selected_field()
+        self.paste_mode_choice.configure(state='readonly' if field and self.idle() else 'disabled')
+        self.paste_mode_label.configure(text=f'Cột {field["name"]} · Kiểu dán:' if field else 'Chọn cột để xem kiểu dán:')
+        if field:self.paste_mode_choice.current(1 if field.get('paste_mode')=='date_dmy' else 0)
+        else:self.paste_mode_choice.set('')
 
     def refresh(self):
         self.environment_choice.configure(values=[env['name'] for env in self.model.environments])
         self.environment_choice.current(next(i for i,env in enumerate(self.model.environments) if env['id']==self.model.active_id))
+        count=sum(any(value.strip() for value in row.values()) for row in self.model.rows)
+        self.environment_summary.configure(text=f'{len(self.model.environments)} bảng · Bảng đang chọn: {len(self.model.fields)} cột, {count} hàng có dữ liệu · Cột ngày tách ô: chọn cột → Trường dữ liệu → Kiểu dán ngày.')
         self.visible_fields=self.model.fields
         self.table.selection=self.selection_bounds()
         self.table.processed=self.completed.get(self.model.active_id,set())
         self.table.current_copy=self.current_copy[1:] if self.current_copy and self.current_copy[0]==self.model.active_id else None
         self.table.set_data(self.visible_fields,self.model.rows,self.table.start,self.cell)
+        self.sync_paste_mode()
 
     def reset_progress(self):
         self.completed.clear();self.current_copy=None;self.latest_copy='';self.latest_row=None
@@ -191,6 +214,16 @@ class HisPanel:
             if item==2:enabled=enabled and index>0
             if item==3:enabled=enabled and index<len(self.model.fields)-1
             self.field_menu.entryconfigure(item,state='normal' if enabled else 'disabled')
+        for item in (6,7):self.field_menu.entryconfigure(item,state='normal' if idle and field else 'disabled')
+
+    def set_paste_mode(self,mode):
+        field=self.selected_field()
+        if not self.idle() or not field:self.sync_paste_mode();return
+        self.commit_editor();self.app.date_paste.clear()
+        try:
+            self.model.set_paste_mode(field['id'],mode);self.refresh()
+            self.info.configure(text=f'{field["name"]}: '+('chọn ô ngày đầu tiên trên HIS rồi Ctrl+V, nhả Ctrl để điền ngày / tháng / năm.' if mode=='date_dmy' else 'dán văn bản vào một ô.'))
+        except (ValueError,OSError) as error:self.app.notify_app('Chưa đổi được kiểu dán',str(error))
 
     def open_field_menu(self,event):
         if not self.idle():return 'break'
@@ -250,6 +283,17 @@ class HisPanel:
         try:self.model.select_environment(self.model.environments[index]['id']);self.reset_selection()
         except (ValueError,OSError) as error:self.refresh();self.app.notify_app('Chưa đổi được môi trường',str(error))
 
+    def delete_environment(self):
+        if not self.idle() or self.app.date_paste.busy:return
+        self.commit_editor()
+        name=next(env['name'] for env in self.model.environments if env['id']==self.model.active_id)
+        if not ThemedMessages.askyesno('Xóa bảng',f'Xóa bảng “{name}”, toàn bộ cột và dữ liệu? Không thể hoàn tác. Kịch bản dùng bảng này cần học lại. Nếu đây là bảng cuối, phần mềm sẽ tạo một bảng trống.',parent=self.parent):return
+        if not self.idle():return
+        try:
+            self.model.delete_environment();self.app.date_paste.clear();self.reset_selection();self.reset_progress()
+            self.info.configure(text=f'Đã xóa bảng “{name}”.')
+        except (ValueError,OSError) as error:self.app.notify_app('Chưa xóa được bảng',str(error))
+
     def clear_all(self):
         if not self.idle():return
         self.commit_editor()
@@ -269,6 +313,7 @@ class HisPanel:
         return min(first[0],last[0]),min(ids.index(first[1]),ids.index(last[1])),max(first[0],last[0]),max(ids.index(first[1]),ids.index(last[1]))
 
     def show_selection(self):
+        self.sync_paste_mode()
         self.table.selection=self.selection_bounds();self.table.selected=self.cell;self.table.draw()
         if self.table.selection:
             r1,c1,r2,c2=self.table.selection
@@ -417,6 +462,8 @@ class HisPanel:
     def copy_cell(self):
         state=self.app.manager.state
         if state not in (self.app.manager.STATE_IDLE,self.app.manager.STATE_RECORDING) or self.app.manager.external_busy:return 'break'
+        if self.app.date_paste.busy:return 'break'
+        self.app.date_paste.clear()
         self.commit_editor()
         bounds=self.selection_bounds()
         if state==self.app.manager.STATE_IDLE and bounds and (bounds[0]!=bounds[2] or bounds[1]!=bounds[3]):
@@ -436,18 +483,26 @@ class HisPanel:
         if not value.strip():
             self.app.notify_app('Ô đang trống',f'STT {row+1} · {field["name"]}: hãy nhập dữ liệu trước khi học.');return 'break'
         if state==self.app.manager.STATE_RECORDING:
-            first=next((action for action in self.app.manager.recorder.actions if action.action_type=='copy_field'),None)
+            first=next((action for action in self.app.manager.recorder.actions if action.action_type in ('copy_field','paste_date')),None)
             if first and first.data_row!=row+1:
                 self.app.notify_app('Hãy lấy cùng một STT',f'Lượt học này đang lấy STT {first.data_row}. Chọn các trường trên cùng hàng đó.');return 'break'
-        try:set_clipboard_text(value)
+        is_date=field.get('paste_mode')=='date_dmy'
+        try:
+            if is_date:
+                from date_paste import date_parts
+                date_parts(value)
+            set_clipboard_text(value)
+            if is_date:
+                recorder=self.app.manager.recorder
+                self.app.date_paste.arm(value,lambda:recorder.record_date_field(field_id,field['name'],row+1) if state==self.app.manager.STATE_RECORDING else None)
         except (OSError,ValueError,RuntimeError) as error:
             self.app.notify_app('Chưa sao chép được',str(error));return 'break'
         if state==self.app.manager.STATE_RECORDING:
-            self.app.manager.recorder.record_field(field_id,field['name'],row+1)
+            if not is_date:self.app.manager.recorder.record_field(field_id,field['name'],row+1)
             self.app.root.withdraw()
             self.app.his_window.withdraw()
             self.app.workspace.set_visible(False)
-        self.app.notify_app('Đã sao chép ô',f'STT {row+1} · {field["name"]}. Quay về HIS và dán.')
+        self.app.notify_app('Đã sao chép ô',f'STT {row+1} · {field["name"]}. '+('Chọn ô ngày đầu tiên trên HIS, Ctrl+V rồi nhả Ctrl để điền 3 ô (trong 60 giây).' if is_date else 'Quay về HIS và dán.'))
         return 'break'
 
     def paste(self):

@@ -413,6 +413,31 @@ class HisUITests(unittest.TestCase):
             ask.assert_not_called();confirm.assert_not_called()
         self.assertEqual(self.app.his.rows[0][field],'Giữ lại')
 
+    def test_date_column_copy_records_only_when_pasted_and_board_delete_requires_confirmation(self):
+        from extensions_ui import ThemedMessages
+        self.install();panel=self.app.his_panel
+        field=self.app.his.add_field('Ngày sinh');self.app.his.set_cell(0,field,'19/08/1987')
+        panel.cell=(0,field);panel.set_paste_mode('date_dmy')
+        self.assertEqual(self.app.his.fields[0]['paste_mode'],'date_dmy')
+        self.assertEqual(panel.paste_mode_choice.current(),1)
+        self.assertEqual(HisEnvironment(self.app.his.path).fields[0]['paste_mode'],'date_dmy')
+        panel.paste_mode_choice.current(0);panel.paste_mode_choice.event_generate('<<ComboboxSelected>>')
+        self.assertEqual(HisEnvironment(self.app.his.path).fields[0]['paste_mode'],'text')
+        panel.paste_mode_choice.current(1);panel.paste_mode_choice.event_generate('<<ComboboxSelected>>')
+        self.assertEqual(HisEnvironment(self.app.his.path).fields[0]['paste_mode'],'date_dmy')
+        with patch('core.keyboard.Listener'),patch('core.mouse.Listener'),patch('core.play_sound'),patch('extensions_ui.set_clipboard_text'),patch.object(self.app.date_paste,'arm') as arm:
+            self.app.manager.start_recording();panel.copy_cell()
+            self.assertEqual(self.app.manager.recorder.actions,[])
+            arm.assert_called_once();arm.call_args.args[1]()
+            self.assertEqual(self.app.manager.recorder.actions[0].action_type,'paste_date')
+            panel.delete_environment();self.assertEqual(len(self.app.his.fields),1)
+            self.app.manager.stop_recording()
+        with patch.object(ThemedMessages,'askyesno',return_value=False):panel.delete_environment()
+        self.assertEqual(len(self.app.his.fields),1)
+        with patch.object(ThemedMessages,'askyesno',return_value=True):panel.delete_environment()
+        self.assertEqual(self.app.his.fields,[]);self.assertEqual(len(self.app.his.environments),1)
+        self.assertIsNone(panel.cell)
+
     def test_header_field_menu_rename_move_delete_confirmation_and_busy_guard(self):
         from extensions_ui import ThemedInputs,ThemedMessages
         from types import SimpleNamespace

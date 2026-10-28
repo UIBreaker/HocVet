@@ -1,3 +1,41 @@
+# Học Vẹt v0.20.3
+
+- Giữ thời gian ổn định ô đích trước khi dán ngày ở tốc độ cao, kiểm tra lại cửa sổ nhận dữ liệu để tránh dán lệch ô.
+- Hiển thị rõ kiểu dán cho cột đang chọn, hỗ trợ đổi trực tiếp giữa văn bản một ô và ngày ba ô HIS; lưu và kiểm tra lại sau khi mở bảng.
+- Dừng trước khi chạy nếu kịch bản vẫn dùng bước sao chép một ô cho cột đã bật ngày ba ô; hướng dẫn học lại thay vì báo hoàn tất sau khi chỉ điền ô ngày.
+- Thêm `verify_his_learning.py`: học qua giao diện và bộ ghi chuột/phím, lưu/nạp lại kịch bản rồi chạy 5 ngày khác nhau ở 1× và 10×; đọc cả ba ô và ô phụ sau mỗi lượt, lưu báo cáo và ảnh. Dùng đúng DPI và kích thước cửa sổ Chrome thực khi ghi tọa độ.
+
+- Từ v0.20.0: sửa dán ngày liên tiếp / phát lại bằng Ctrl+V, giữ ô phụ thứ tư và sửa bố cục bảng điều khiển khi thu nhỏ / đổi DPI.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Cột ngày chia ba ô cần chọn đúng kiểu dán và học lại bước dán; kịch bản cũ chưa phù hợp sẽ bị chặn trước khi chạy.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.20.3-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Dán ngày ba ô yêu cầu thứ tự Tab ngày → tháng → năm. Đã kiểm tra trên HIS giả lập; chưa xác minh trên HIS thực tế. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**.
+
+---
+
+# Học Vẹt v0.20.2
+
+- Sửa trường hợp Ctrl+V chỉ dán vào ô đầu tiên: không hủy chế độ tách ngày khi clipboard được ghi lại cùng nội dung; nhận Ctrl+V do công cụ bàn phím phát lại và bỏ qua các phím do chính lượt dán sinh ra.
+- Xóa trạng thái giữ phím V sau mỗi lượt để không chặn lượt dán kế tiếp. Tự tạo lại listener nếu listener cũ đã dừng.
+- Kiểm tra qua HisPanel → Ctrl+V → ba ô của file HIS giả lập, cả khi đang học; giữ nguyên ô phụ thứ tư. Chưa thử trên HIS thật.
+
+---
+
+# Học Vẹt v0.20.1
+
+- Sửa lỗi thỉnh thoảng phần kịch bản chiếm hết bảng, làm khuất chuyển trang / Mở ứng dụng / Dừng / mở HIS. Dành riêng vùng dưới cho các nút, vùng kịch bản chỉ dùng phần chiều cao còn lại.
+- Tính lại chiều cao thực sau khi Tk bố trí xong, thay vì dùng số đo cũ; tự đổi số dòng ngay cả lúc đang chạy hoặc thay đổi DPI. Chặn tính bố cục lặp trong lúc giao diện đang cập nhật.
+- Tự bảo đảm chiều cao tối thiểu cho một thẻ kịch bản và giới hạn bảng trong vùng màn hình; giữ các điều khiển lặp của thẻ nhìn thấy.
+- Tái hiện được lỗi trước khi sửa; kiểm tra thu nhỏ khi bận, cài / gỡ HIS, ẩn / mở lại và chu kỳ bố cục ở DPI 100% / 125% / 150% / 200%. Kiểm tra tương tác thật trên cửa sổ mẫu vẫn cho chuột phát xuyên bảng và nút Dừng hoạt động.
+
+---
+
 # Học Vẹt v0.20.0
 
 - Trải nghiệm cài / gỡ tiện ích có trạng thái đang xử lý, thanh tiến trình, khóa nút trong lúc thực hiện và thông báo hoàn tất. Gói công cụ đi kèm ứng dụng, không tạo thông báo tải mạng. Gỡ có xác nhận và giữ dữ liệu bảng để cài lại.

@@ -19,7 +19,7 @@ def verify_bundled_sources(root):
             return isinstance(right,types.CodeType) and left.co_code==right.co_code and left.co_names==right.co_names and len(left.co_consts)==len(right.co_consts) and all(same(a,b) for a,b in zip(left.co_consts,right.co_consts))
         return left==right
     for name in ('ui','core','app_info','ui_theme','retro_controls','record_notice','overlay_input',
-                 'workspace','workspace_ui','his_environment','extensions_ui','sheet_grid','clipboard_text'):
+                 'workspace','workspace_ui','his_environment','extensions_ui','sheet_grid','clipboard_text','date_paste'):
         bundled=archive.extract(name)
         source=compile((root/(name+'.py')).read_bytes(),bundled.co_filename,'exec')
         if not same(bundled,source):raise ValueError(f'File đóng gói còn mã cũ: {name}. Hãy tạo lại thư mục build của phiên bản này.')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     project = Path(__file__).resolve().parent
     for command in (
             [sys.executable, '-X', 'utf8', 'test_core.py'],
-            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_features', 'test_theme', 'test_workspace', 'test_overlay_input', 'test_his'],
+            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_features', 'test_theme', 'test_workspace', 'test_overlay_input', 'test_his', 'test_date_paste'],
             [sys.executable, '-m', 'PyInstaller', '--noconfirm','--workpath',str(project/'build'/f'release-{APP_VERSION}'),'HocVet.spec']):
         subprocess.run(command, cwd=project, check=True)
     verify_bundled_sources(project)

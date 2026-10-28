@@ -4,6 +4,26 @@ from ctypes import wintypes
 import time
 
 
+def get_clipboard_text():
+    """Đọc nhanh để nhận biết clipboard đổi nội dung, không chờ trong keyboard hook."""
+    user=ctypes.WinDLL('user32',use_last_error=True)
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    user.GetClipboardData.argtypes=[wintypes.UINT]
+    user.GetClipboardData.restype=wintypes.HANDLE
+    kernel.GlobalLock.argtypes=[wintypes.HGLOBAL]
+    kernel.GlobalLock.restype=ctypes.c_void_p
+    kernel.GlobalUnlock.argtypes=[wintypes.HGLOBAL]
+    if not user.OpenClipboard(None):return None
+    try:
+        handle=user.GetClipboardData(13)
+        if not handle:return ''
+        pointer=kernel.GlobalLock(handle)
+        if not pointer:return None
+        try:return ctypes.wstring_at(pointer)
+        finally:kernel.GlobalUnlock(handle)
+    finally:user.CloseClipboard()
+
+
 def set_clipboard_text(text, cancel_event=None):
     if not isinstance(text,str) or len(text)>1000000 or '\0' in text:
         raise ValueError('Nội dung clipboard không hợp lệ.')

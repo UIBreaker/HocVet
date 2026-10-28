@@ -300,6 +300,9 @@ class HocVetApp:
         self.manager.on_record_stopped = lambda profile, count: self._post(self._record_saved, profile, count)
         self.manager.recorder.ignore_mouse = lambda x,y:self.record_notice.moving or self._is_own_window(x,y)
         self.manager.recorder.ignore_keyboard = self._is_own_focus
+        from date_paste import DatePaste
+        self.date_paste=DatePaste(self._is_own_focus,lambda error:self._post(self.notify_app,'Chưa dán được ngày',error))
+        self.manager.recorder.ignore_key_event=self.date_paste.ignore_recording
         self.manager.player.protect_mouse = self._is_own_window
         self.manager.player.protect_keyboard = self._is_own_focus
         self.overlay_input = OverlayInput()
@@ -390,6 +393,7 @@ class HocVetApp:
     def _cleanup_ui(self, event):
         if event.widget is self.root:
             self._closing = True
+            self.date_paste.close()
             self.overlay_input.close()
             self.record_notice.close(force=True)
             if hasattr(self, 'workspace'): self.workspace.close()
@@ -821,6 +825,7 @@ class HocVetApp:
         self.extensions.cancel_installation()
         if self.his_panel:self.his_panel.commit_editor()
         self._closing = True
+        self.date_paste.close()
         self.manager.stop_global_hotkeys()
         self._exit_error=''
         self._exit_workspace_recording=bool(self.workspace.engine and self.workspace.engine.recording is True)
@@ -1366,6 +1371,7 @@ class HocVetApp:
 
     def _cmd_start_recording(self, force_countdown=False, from_hotkey=False):
         if self._closing:return
+        if self.date_paste.busy:return
         if self.extensions.busy:return
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
         if self.his_panel and self.his_panel.editor:return
@@ -1437,6 +1443,7 @@ class HocVetApp:
 
     def _cmd_start_playing(self, from_hotkey=False):
         if self._closing:return
+        if self.date_paste.busy:return
         if self.extensions.busy:return
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
         if self._shortcut_dialogs: return
@@ -1507,6 +1514,8 @@ class HocVetApp:
         self.root.title(f"Học Vẹt — {text[:90]}")
 
     def _on_manager_state_changed(self, new_state: str):
+        self.date_paste.clear()
+        if self.date_paste.busy:self.date_paste.cancel.set()
         self._post(self._handle_state_ui, new_state)
 
     def _on_profile_triggered(self, profile: ScriptProfile):
@@ -1630,8 +1639,8 @@ class HocVetApp:
         elif act_type == 'wait_image':
             t_name = 'Chờ ảnh / nút'
             detail = f'Vùng ({action.x}, {action.y}) | Tối đa {action.timeout:g}s | Sai số {action.tolerance:.0%}'
-        elif act_type=='copy_field':
-            t_name='Lấy dữ liệu HIS'
+        elif act_type in ('copy_field','paste_date'):
+            t_name='Dán ngày → 3 ô HIS' if act_type=='paste_date' else 'Lấy dữ liệu HIS'
             detail=f'{action.data_label or action.data_field} · STT {action.data_row} + mỗi vòng kế tiếp'
         elif act_type == "key_press":
             t_name = "Nhấn phím"

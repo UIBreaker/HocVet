@@ -1,22 +1,21 @@
-# Học Vẹt · v0.20.0
+# Học Vẹt · v0.20.3
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.20.0
+## Có gì mới trong 0.20.3
 
-- Cài / gỡ tiện ích có tiến trình và thông báo hoàn tất; giữ dữ liệu khi gỡ.
-- **Môi trường thao tác HIS** mở trong cửa sổ riêng, mở lại từ tiện ích hoặc bảng điều khiển.
-- Mở / ẩn và kéo bảng điều khiển ngay khi đang chạy; ẩn bảng vẫn tiếp tục công việc.
-- Tùy chỉnh cột dữ liệu, học có đếm ngược **3–2–1**, tô màu các ô đã lấy theo từng vòng.
-- **Thoát toàn bộ** luôn ở cuối thanh tab, nền đỏ chữ trắng.
+- Chọn rõ kiểu dán **văn bản một ô** hoặc **ngày → ba ô HIS** cho từng cột; lưu cùng bảng.
+- Sửa dán ngày liên tiếp bằng Ctrl+V và khi phát lại; giữ nguyên ô phụ thứ tư.
+- Chặn kịch bản cũ chưa học bước dán ba ô, báo cần học lại trước khi chạy.
+- Sửa bố cục bảng điều khiển để các nút dưới luôn hiện, kể cả khi thu nhỏ hoặc đổi DPI.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.20.0-Windows.zip** tại [bản phát hành 0.20.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.20.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.20.3-Windows.zip** tại [bản phát hành 0.20.3](https://github.com/UIBreaker/HocVet/releases/tag/v0.20.3); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -77,6 +76,10 @@ Chỉ chỉnh lặp và kích thước khi đang dừng; trong lúc học / ch�
 
 ![Bảng nổi thu nhỏ](docs/images/tray-panel-small.png)
 
+Bảng tự dành chỗ cho hàng nút dưới và điều chỉnh số thẻ kịch bản theo chiều cao còn lại, cả khi đang chạy hoặc đổi DPI.
+
+![Bảng nhỏ vẫn hiển thị đủ nút điều khiển](docs/images/panel-layout-small.png)
+
 ![Bảng nổi phóng lớn](docs/images/tray-panel-large.png)
 
 ## Cài đặt phím tắt
@@ -130,7 +133,11 @@ Chọn ô cần bắt đầu rồi **Ctrl+V** hoặc **Dán dữ liệu**. Ví d
 
 **Nhiều môi trường:** bấm **+ Tạo mới**, đặt tên rồi thêm trường / dán dữ liệu. Chọn bảng cũ bằng danh sách **Bảng**. Mỗi môi trường có dữ liệu riêng. Kịch bản đã học vẫn lấy bảng chứa các trường đã học dù bạn đang xem bảng khác; kịch bản chia sẻ từ máy khác sẽ ghép tên trường vào bảng đang chọn khi không có mã trường gốc. Khi học không chuyển bảng.
 
-**Quét chọn và xóa:** kéo chuột từ ô đầu đến ô cuối, Shift + bấm hoặc Shift + mũi tên để mở rộng vùng. Kéo ra mép bảng sẽ tự cuộn. Ctrl+A chọn toàn bộ dữ liệu; Ctrl+C sao chép vùng theo hàng / cột để dán ra Excel. Delete hoặc **Xóa vùng chọn** chỉ xóa nội dung, giữ STT và trường. **Làm trống bảng** xóa toàn bộ dữ liệu bảng đang chọn sau khi xác nhận, giữ cột để dán danh sách mới và giữ nguyên các bảng khác. Các thao tác tạo / đổi / xóa bị khóa khi học hoặc chạy.
+**Xóa bảng:** chọn môi trường rồi bấm **Xóa bảng**, kiểm tra tên và xác nhận. Thao tác xóa cả trường và dữ liệu của bảng đó, giữ các bảng khác; kịch bản tham chiếu bảng đã xóa sẽ bị chặn. Nếu xóa bảng cuối, ứng dụng giữ một môi trường trống.
+
+**Quét chọn và xóa:** kéo chuột từ ô đầu đến ô cuối, Shift + bấm hoặc Shift + mũi tên để mở rộng vùng. Kéo ra mép bảng sẽ tự cuộn. Ctrl+A chọn toàn bộ dữ liệu; Ctrl+C sao chép vùng theo hàng / cột để dán ra Excel. Delete hoặc **Xóa vùng chọn** chỉ xóa nội dung, giữ STT và trường. **Làm trống dữ liệu** xóa dữ liệu bảng đang chọn sau khi xác nhận, giữ cột và các bảng khác. **Xóa bảng** xóa cả bảng, các cột và dữ liệu sau xác nhận; kịch bản dùng bảng đã xóa sẽ báo cần học lại. Xóa bảng cuối sẽ tạo một bảng trống. Các thao tác tạo / đổi / xóa bị khóa khi học hoặc chạy.
+
+**Ngày tháng tách ô HIS:** chọn một ô của cột ngày, đặt **Kiểu dán** thành **Ngày / tháng / năm → 3 ô HIS** ở hàng tùy chọn của cột (hoặc qua menu **Trường dữ liệu → Kiểu dán: ngày → 3 ô HIS (dd/mm/yyyy)**). Tiêu đề cột hiện **Ngày → 3 ô**. Nhập ngày đầy đủ như `19/08/1987`, sao chép ô như bình thường, chọn **ô ngày đầu tiên** trên HIS rồi **Ctrl+V và nhả Ctrl**: phần mềm thay nội dung lần lượt ba ô ngày, tháng, năm bằng Tab; ô phụ thứ tư được giữ nguyên. Chế độ chờ dán có hiệu lực 60 giây và hủy nếu nội dung clipboard đổi; việc ghi lại cùng nội dung không hủy chế độ này. Khi học, bước **Dán ngày → 3 ô HIS** được ghi khi bạn dán; mỗi vòng chạy lấy ngày của hàng kế tiếp và kiểm tra ngày hợp lệ trước khi bắt đầu. Kịch bản cũ cần học lại bước này để dùng kiểu dán mới. Với ngày nằm trong một textbox duy nhất, giữ **Kiểu dán: văn bản một ô**. Tính năng yêu cầu ba ô liền nhau theo thứ tự Tab ngày → tháng → năm; đã kiểm tra trên trang HIS giả lập, chưa kiểm tra trên HIS thực tế.
 
 Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tiện ích** có xác nhận, đóng cửa sổ môi trường và bỏ nút mở trên bảng điều khiển, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong cửa sổ môi trường.
 
@@ -185,7 +192,7 @@ Kiểm thử:
 
 ```powershell
 python test_core.py
-python -m unittest -v test_features test_theme test_workspace test_overlay_input test_his
+python -m unittest -v test_features test_theme test_workspace test_overlay_input test_his test_date_paste
 ```
 
 Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên qua bảng nổi (cần Microsoft Edge; bài kiểm thử bảng nổi dùng chuột thật trên cửa sổ mẫu rồi trả lại vị trí cũ):
@@ -194,6 +201,14 @@ Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên
 $env:HOCVET_INTEGRATION = '1'
 python -m unittest -v test_workspace.IntegrationTests test_overlay_input.NativePassThroughTests
 ```
+
+Kiểm thử học qua giao diện rồi phát lại 5 ngày ở 1× và 10× trên trang HIS giả lập:
+
+```powershell
+python verify_his_learning.py --fixture "C:\duong-dan\HIS-mau.html"
+```
+
+Trang mẫu cần các ô `birth_day`, `birth_month`, `birth_year`, `birth_extra`, `full_name` và thứ tự Tab ngày → tháng → năm. Báo cáo từng hàng và ảnh kiểm tra nằm trong `build/his-learning/`. Bài này dùng Chrome và chuột / bàn phím thật; chạy riêng sau các bài giao diện khác.
 
 Đóng gói (cần PyInstaller):
 

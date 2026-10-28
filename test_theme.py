@@ -19,6 +19,56 @@ class ThemeTests(unittest.TestCase):
         self.root = None
         gc.collect()
 
+    def test_panel_keeps_footer_visible_after_busy_shrink_environment_and_reopen(self):
+        from record_notice import RecordNotice
+        from core import ScriptProfile,MacroAction
+        from unittest.mock import Mock
+        notice=RecordNotice(self.root);self.addCleanup(lambda:notice.close(force=True))
+        profiles=[ScriptProfile(name='Kịch bản có tên dài để kiểm tra bố cục',actions=[MacroAction('key_press',0,key='a')])]
+        notice.pin(profiles,Mock(),Mock(),Mock(),size=(420,680))
+        self.root.update()
+        notice.set_busy(True)
+        notice.window.geometry('420x430')
+        self.root.update()
+        self.assertTrue(notice.stop_button.winfo_ismapped())
+        self.assertLessEqual(notice.stop_button.winfo_rooty()+notice.stop_button.winfo_height(),notice.window.winfo_rooty()+notice.window.winfo_height())
+        for installed in (True,False,True):
+            notice.set_environment_enabled(installed,False)
+            notice.show('Đang chạy','Thông báo đổi nội dung khi bảng đang nhỏ.',progress=40)
+            self.root.update()
+            self.assertTrue(notice.stop_button.winfo_ismapped())
+            if installed:
+                self.assertTrue(notice.environment_button.winfo_ismapped())
+                self.assertLessEqual(notice.environment_button.winfo_rooty()+notice.environment_button.winfo_height(),notice.window.winfo_rooty()+notice.window.winfo_height())
+        notice.set_busy(False);notice.hide();notice.hidden=False
+        notice.pin(profiles,Mock(),Mock(),Mock(),size=(420,430))
+        self.root.update()
+        self.assertTrue(notice.stop_button.winfo_ismapped())
+
+    def test_panel_repeated_layout_changes_at_different_dpi_keep_controls_inside(self):
+        from record_notice import RecordNotice
+        from core import ScriptProfile
+        from unittest.mock import Mock
+        from types import SimpleNamespace
+        original=float(self.root.tk.call('tk','scaling'))
+        try:
+            for scaling in (4/3,5/3,2,8/3):
+                self.root.tk.call('tk','scaling',scaling);apply_theme(self.root,self.root.winfo_fpixels('1i')/96)
+                notice=RecordNotice(self.root)
+                with patch.object(notice,'_work_area',return_value=SimpleNamespace(left=0,top=0,right=1400,bottom=760)):
+                    try:
+                        notice.pin([ScriptProfile(name='Kịch bản mẫu để kiểm tra chiều cao')],Mock(),Mock(),Mock(),size=(440,600))
+                        for cycle in range(6):
+                            notice.set_busy(bool(cycle%2));notice.set_environment_enabled(bool(cycle%3),False)
+                            notice.show('Bảng điều khiển · đang cập nhật','Nội dung tiến độ thay đổi nhưng các nút vẫn phải hiển thị.',progress=cycle*10)
+                            self.root.update()
+                            for button in [notice.stop_button,notice.repeat_buttons[-1]]+([notice.environment_button] if notice.environment_button else []):
+                                self.assertTrue(button.winfo_ismapped(),(scaling,cycle))
+                                self.assertLessEqual(button.winfo_rooty()+button.winfo_height(),notice.window.winfo_rooty()+notice.window.winfo_height(),(scaling,cycle))
+                            notice.hide();notice.hidden=False
+                    finally:notice.close(force=True)
+        finally:self.root.tk.call('tk','scaling',original)
+
     def test_panel_repeat_controls_and_resizing_reflow_without_clipping_stop(self):
         from record_notice import RecordNotice
         from core import ScriptProfile,MacroAction

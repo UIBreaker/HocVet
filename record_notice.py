@@ -24,6 +24,7 @@ class RecordNotice:
         self.per_page = 3
         self._layout_timer = None
         self._row_height = self._chrome_height = None
+        self._fitting = False
         self._resizing = False
         self.environment_enabled = False
         self.environment_available = True
@@ -70,8 +71,9 @@ class RecordNotice:
         self.repeat_buttons = []
         self.slots = []
         self.name_labels = []
-        rows = tk.Frame(self.launcher,bg=VINTAGE_BG)
+        rows = self.rows = tk.Frame(self.launcher,bg=VINTAGE_BG)
         rows.pack(fill='both',expand=True)
+        rows.bind('<Configure>',self._queue_layout)
         for index in range(per_page):
             slot = tk.Frame(rows, bg=VINTAGE_CARD_BG, padx=10, pady=6)
             slot.pack(fill='both',expand=True,pady=(5,0))
@@ -103,14 +105,14 @@ class RecordNotice:
                 edit.configure(state='disabled' if self.busy or not profile or not self.on_repeat else 'normal')
                 self.repeat_buttons.append(edit)
         navigation = ttk.Frame(self.launcher)
-        navigation.pack(fill='x', pady=6)
+        navigation.pack(side='bottom',fill='x',pady=6,before=rows)
         ttk.Button(navigation, text='‹ Trước', width=6, takefocus=False, command=lambda:self._page(-1),
             state='normal' if self.page and not self.busy else 'disabled').pack(side='left')
         ttk.Label(navigation, text=f'{self.page+1}/{pages} · {len(self.profiles)} kịch bản').pack(side='left', expand=True)
         ttk.Button(navigation, text='Sau ›', width=6, takefocus=False, command=lambda:self._page(1),
             state='normal' if self.page+1 < pages and not self.busy else 'disabled').pack(side='right')
         footer = ttk.Frame(self.launcher)
-        footer.pack(fill='x')
+        footer.pack(side='bottom',fill='x',before=navigation)
         ttk.Button(footer, text='Mở ứng dụng', takefocus=False,command=lambda:self.on_open(),
             state='normal' if not self.busy else 'disabled').pack(side='left')
         self.stop_button = ttk.Button(footer, text='■ Dừng', style='Danger.TButton', takefocus=False,
@@ -122,8 +124,8 @@ class RecordNotice:
             self.environment_button=ttk.Button(self.launcher,text='Mở môi trường HIS',takefocus=False,
                 command=lambda:self.on_environment() if self.on_environment else None,
                 state='normal' if self.environment_available else 'disabled')
-            self.environment_button.pack(fill='x',pady=(6,0))
-        if self.size and self._layout_timer is None:
+            self.environment_button.pack(side='bottom',fill='x',pady=(6,0),before=footer)
+        if self._layout_timer is None:
             self._layout_timer = self.root.after_idle(self._fit_layout)
 
     def _page(self, delta):
@@ -132,7 +134,7 @@ class RecordNotice:
         self._render_profiles()
 
     def _queue_layout(self, event):
-        if (event.widget is self.window or event.widget in getattr(self,'slots',[])) and self.pinned and self._layout_timer is None:
+        if not self._fitting and (event.widget in (self.window,getattr(self,'rows',None)) or event.widget in getattr(self,'slots',[])) and self.pinned and self._layout_timer is None:
             self._layout_timer = self.root.after_idle(self._fit_layout)
 
     def _fit_layout(self):
@@ -140,21 +142,30 @@ class RecordNotice:
             self.root.after_cancel(self._layout_timer)
         self._layout_timer = None
         if not self.window or not self.pinned or not self.launcher or not self.window.winfo_ismapped(): return
-        if self._row_height is None:
-            self._row_height = max(slot.winfo_reqheight()+5 for slot in self.slots)
-            self._chrome_height = self.window.winfo_reqheight()-self.per_page*self._row_height
-        count = max(1,(self.window.winfo_height()-self._chrome_height)//self._row_height)
-        if count != self.per_page and not self.busy:
-            first = self.page*self.per_page
-            self.per_page = count
-            self.page = first//count
-            self._render_profiles()
-            return
-        if self.size:
+        if self._fitting:return
+        self._fitting=True
+        try:
+            self.window.update_idletasks()
+            self._row_height=max(slot.winfo_reqheight()+5 for slot in self.slots)
+            self._chrome_height=self.window.winfo_reqheight()-self.rows.winfo_reqheight()
+            minimum=self._chrome_height+self._row_height
+            work=self._work_area(*self.position) if self.position else self._work_area()
+            if self.window.winfo_height()<minimum<=work.bottom-work.top:
+                width=self.window.winfo_width()
+                self.window.geometry(f'{width}x{minimum}')
+                if self.size:self.size=(width,minimum)
+                return
+            count=max(1,self.rows.winfo_height()//self._row_height)
+            if count!=self.per_page:
+                first=self.page*self.per_page;self.per_page=count;self.page=first//count
+                self._render_profiles()
+                return
             self.title.configure(wraplength=max(100,self.window.winfo_width()-40))
             self.message.configure(wraplength=max(100,self.window.winfo_width()-40))
             for slot,label,button in zip(self.slots,self.name_labels,self.run_buttons):
                 label.configure(wraplength=max(80,slot.winfo_width()-button.winfo_reqwidth()-32))
+            if self.on_geometry:self.on_geometry()
+        finally:self._fitting=False
 
     def resize(self, width, height, save=True):
         if self.busy or not self.pinned or not self.window: return
@@ -314,6 +325,8 @@ class RecordNotice:
             width=min(work.right-work.left,max(round(320*scale),self.size[0]))
             minimum=(self._chrome_height+self._row_height) if self._row_height is not None else 340
             height=min(work.bottom-work.top,max(minimum,self.size[1]))
+        width=min(width,work.right-work.left)
+        height=min(height,work.bottom-work.top)
         x, y = max(work.left, work.right-width-24), max(work.top, work.bottom-height-24)
         if self.position and self.pinned:
             x = max(work.left,min(work.right-width,self.position[0]))
