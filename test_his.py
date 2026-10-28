@@ -95,6 +95,35 @@ class HisDataTests(unittest.TestCase):
 class MultipleEnvironmentTests(unittest.TestCase):
     setUp=HisDataTests.setUp
     copies=HisDataTests.copies
+    def test_field_customization_keeps_ids_and_deleted_sources_never_use_another_table(self):
+        actions=self.copies();original=self.model.active_id
+        self.model.rename_field(self.name,'Tên người đăng ký');self.model.move_field(self.name,1)
+        self.assertEqual(self.model.fields[1]['id'],self.name)
+        self.assertEqual(self.model.prepare(actions,1)[1](self.name,1),'Mẫu A')
+        before=self.model.path.read_bytes()
+        with patch.object(MacroStorage,'_atomic_json',side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):self.model.delete_field(self.name)
+        self.assertEqual(self.model.path.read_bytes(),before)
+        self.model.delete_field(self.name);self.model.delete_field(self.code)
+        self.assertEqual(self.model.fields,[]);self.assertEqual(self.model.rows,[{},{},{}])
+        self.model.create_environment('Bảng khác');self.model.add_field('Họ và tên');self.model.add_field('CCCD')
+        self.model.paste(0,0,[['Không được lấy','00000']])
+        with self.assertRaisesRegex(ValueError,'đã bị xóa'):self.model.prepare(actions,1)
+        loaded=HisEnvironment(self.model.path)
+        with self.assertRaisesRegex(ValueError,'đã bị xóa'):loaded.prepare(actions,1)
+        loaded.select_environment(original)
+        self.assertEqual(len(loaded.environments[0]['removed_fields']),2)
+
+    def test_copy_progress_callback_only_after_clipboard_success(self):
+        _,reader=self.model.prepare(self.copies(),1)
+        with patch('core.mouse.Controller'),patch('core.keyboard.Controller'):player=MacroPlayer()
+        player.field_reader=reader;player.on_field_copied=Mock()
+        with patch('core.set_clipboard_text'):
+            player._execute_action(self.copies()[0])
+        player.on_field_copied.assert_called_once_with(self.model.active_id,self.name,1)
+        with patch('core.set_clipboard_text',side_effect=OSError('clipboard busy')):
+            with self.assertRaises(OSError):player._execute_action(self.copies()[1])
+        self.assertEqual(player.on_field_copied.call_count,1)
     def test_create_switch_reload_and_play_uses_learned_table(self):
         original=self.model.active_id;actions=self.copies()
         self.model.create_environment('Bảng mới')
@@ -202,10 +231,12 @@ class HisUITests(unittest.TestCase):
 
     def install(self):
         with patch.object(self.app,'_show_his_environment'):self.app._set_his_installed(True)
+        self.app.his_window.focus_force=Mock()
 
     def test_install_remove_reinstall_keeps_fields_and_rows(self):
         self.assertEqual(len(self.app.tabs.tabs()),6)
-        self.install();self.assertEqual(len(self.app.tabs.tabs()),7)
+        self.install();self.assertEqual(len(self.app.tabs.tabs()),6)
+        self.assertIsInstance(self.app.his_window,tk.Toplevel)
         field=self.app.his.add_field('Họ và tên');self.app.his.set_cell(0,field,'Dữ liệu mẫu')
         self.app._set_his_installed(False)
         self.assertIsNone(self.app.his_panel);self.assertEqual(len(self.app.tabs.tabs()),6)
@@ -272,7 +303,7 @@ class HisUITests(unittest.TestCase):
             self.app._pin_controls();self.app._process_ui_events()
             self.assertTrue(self.app.record_notice.environment_enabled)
             self.app._show_his_environment()
-            self.assertEqual(self.app.tabs.select(),str(self.app.his_tab))
+            self.assertEqual(self.app.his_window.state(),'normal')
             self.assertEqual(self.app.manager.state,MacroManager.STATE_RECORDING)
             self.app.manager.stop_recording()
 
@@ -327,7 +358,11 @@ class HisUITests(unittest.TestCase):
 
     def test_exit_has_own_tab_and_invokes_full_shutdown(self):
         labels=[self.app.tabs.tab(tab,'text') for tab in self.app.tabs.tabs()]
-        self.assertEqual(labels[labels.index('Tính năng mở rộng')+1],'Thoát toàn bộ')
+        self.assertEqual(labels[-1],'Thoát toàn bộ')
+        for installed in (True,False,True):
+            with patch.object(self.app,'_show_his_environment'):self.app._set_his_installed(installed)
+            self.assertEqual(self.app.tabs.tabs()[-1],str(self.app.exit_tab))
+        self.assertTrue(self.app.tabs.tab(self.app.exit_tab,'image'))
         self.root.update()
         with patch.object(self.app,'_exit_app') as exit_app:
             self.app.tabs.select(self.app.exit_tab);self.root.update()
@@ -378,6 +413,73 @@ class HisUITests(unittest.TestCase):
             ask.assert_not_called();confirm.assert_not_called()
         self.assertEqual(self.app.his.rows[0][field],'Giữ lại')
 
+    def test_header_field_menu_rename_move_delete_confirmation_and_busy_guard(self):
+        from extensions_ui import ThemedInputs,ThemedMessages
+        from types import SimpleNamespace
+        self.install();name=self.app.his.add_field('Tên');code=self.app.his.add_field('CCCD')
+        self.app.his.paste(0,0,[['Mẫu','001']]);panel=self.app.his_panel;panel.refresh()
+        panel.table.geometry_cells()
+        x=(panel.table.edges[1]+panel.table.edges[2])/2-panel.table.canvasx(0)
+        panel.select_cell(SimpleNamespace(x=x,y=5))
+        self.assertEqual(panel.selected_field()['id'],name)
+        with patch.object(ThemedInputs,'askstring',return_value='Họ và tên'):panel.rename_field()
+        panel.move_field(1);self.assertEqual(self.app.his.fields[1]['id'],name)
+        with patch.object(ThemedMessages,'askyesno',return_value=False):panel.delete_field()
+        self.assertEqual(len(self.app.his.fields),2)
+        with patch.object(ThemedMessages,'askyesno',return_value=True):panel.delete_field()
+        self.assertEqual(self.app.his.fields,[{'id':code,'name':'CCCD'}])
+        self.assertEqual(self.app.his.rows,[{code:'001'}])
+        panel.cell=(0,code);self.app.manager.external_busy=True
+        with patch.object(ThemedMessages,'askyesno') as ask:panel.delete_field();ask.assert_not_called()
+
+    def test_his_button_always_counts_down_and_stop_cancels_before_learning(self):
+        self.install();panel=self.app.his_panel;self.app.countdown_var.set(False)
+        self.app._show_his_environment();self.root.update_idletasks()
+        with patch.object(self.app,'_do_start_record') as start:
+            panel.learn.invoke()
+            self.assertEqual(self.app.manager.state,MacroManager.STATE_COUNTDOWN)
+            self.assertIn('3 GIÂY',panel.instructions.cget('text'));self.assertFalse(self.app.manager.recorder.is_recording)
+            self.assertIn('3',self.app.record_notice.title.cget('text'))
+            self.assertEqual(str(panel.stop.cget('state')),'normal')
+            panel.stop.invoke();start.assert_not_called()
+            self.assertEqual(self.app.manager.state,MacroManager.STATE_IDLE)
+            self.app._process_ui_events()
+            panel.learn.invoke()
+            for seconds in (2,1,0):
+                self.root.after_cancel(self.app.countdown_timer);self.app._start_countdown(seconds)
+                if seconds:self.assertIn(f'{seconds} GIÂY',panel.instructions.cget('text'))
+            start.assert_called_once()
+
+    def test_progress_tracks_real_rows_and_source_without_changing_data(self):
+        self.install();name=self.app.his.add_field('Tên');code=self.app.his.add_field('CCCD')
+        self.app.his.paste(0,0,[['Mẫu 1','001'],['Mẫu 2','002']]);panel=self.app.his_panel;panel.refresh()
+        before=self.app.his.path.read_bytes();env=self.app.his.active_id
+        self.app._his_field_copied(env,name,1);self.app._his_field_copied(env,code,1);panel.refresh()
+        self.assertIn((0,name),panel.table.processed);self.assertEqual(panel.table.current_copy,(0,code))
+        self.app._his_field_copied(env,name,2);panel.finish_progress(False)
+        self.assertEqual(panel.current_copy,(env,1,name))
+        self.assertIn('Đã dừng tại',panel.progress_info.cget('text'))
+        panel.finish_progress(True);self.assertIsNone(panel.current_copy)
+        self.assertEqual(len(panel.completed[env]),3)
+        self.assertEqual(self.app.his.path.read_bytes(),before)
+        panel.reset_progress();self.assertFalse(panel.table.processed)
+
+    def test_worker_playback_reports_each_copied_cell_to_ui_in_loop_order(self):
+        self.install();name=self.app.his.add_field('Tên');code=self.app.his.add_field('CCCD')
+        self.app.his.paste(0,0,[['Mẫu 1','001'],['Mẫu 2','002'],['Mẫu 3','003']])
+        actions=[MacroAction('copy_field',0,data_field=field,data_row=1) for field in (name,code)]
+        player=self.app.manager.player;player.mouse_controller=Mock();player.keyboard_controller=Mock()
+        player.field_reader=self.app.his.prepare(actions,3)[1]
+        self.app.manager._set_state(MacroManager.STATE_PLAYING)
+        with patch('core.play_sound'),patch('core.set_clipboard_text') as copied:
+            player.play_async(actions,10,3,0);player._play_thread.join(3)
+            self.assertFalse(player.is_playing)
+            self.app._process_ui_events()
+        self.assertEqual([call.args[0] for call in copied.call_args_list],['Mẫu 1','001','Mẫu 2','002','Mẫu 3','003'])
+        panel=self.app.his_panel
+        self.assertEqual(panel.table.processed,{(row,field) for row in range(3) for field in (name,code)})
+        self.assertIsNone(panel.table.current_copy);self.assertIn('STT 3',panel.latest_copy)
+
     def test_full_exit_preserves_private_learning_actions(self):
         engine=Mock();engine.recording=True;engine.thread.is_alive.return_value=False
         engine.actions=[{'kind':'text','text':'Mẫu công việc'}]
@@ -387,6 +489,60 @@ class HisUITests(unittest.TestCase):
         self.assertTrue(panel.library_path.exists())
         self.assertEqual(panel.actions,engine.actions)
 
+    def test_installation_feedback_and_separate_window_lifecycle(self):
+        from extensions_ui import ThemedMessages
+        extension=self.app.extensions
+        extension.change_installation(True)
+        self.assertTrue(extension.busy)
+        self.assertIn('Đang cài',extension.status.cget('text'))
+        with patch.object(self.app,'_do_start_record') as start:
+            self.app._cmd_start_recording();start.assert_not_called()
+        extension.finish_installation(True)
+        self.assertFalse(extension.busy);self.assertTrue(self.app.his.installed)
+        self.assertIn('HOÀN TẤT',extension.status.cget('text'))
+        win=self.app.his_window;win.focus_force=Mock()
+        self.assertEqual(win.state(),'withdrawn');self.assertEqual(len(self.app.tabs.tabs()),6)
+        self.assertNotIn('Môi trường thao tác',[self.app.tabs.tab(tab,'text') for tab in self.app.tabs.tabs()])
+        field=self.app.his.add_field('Tên');self.app.his.set_cell(0,field,'Mẫu giữ lại')
+        self.app._show_his_environment();self.assertEqual(self.root.state(),'withdrawn')
+        self.app._hide_his_environment();self.assertEqual(win.state(),'withdrawn')
+        with patch.object(ThemedMessages,'askyesno',return_value=False):extension.change_installation(False)
+        self.assertTrue(self.app.his.installed)
+        with patch.object(ThemedMessages,'askyesno',return_value=True):extension.change_installation(False)
+        self.assertTrue(extension.busy);extension.finish_installation(False)
+        self.assertIsNone(self.app.his_window);self.assertFalse(win.winfo_exists())
+        extension.change_installation(True);extension.finish_installation(True)
+        self.assertEqual(self.app.his.rows[0][field],'Mẫu giữ lại')
+
+    def test_panel_environment_button_and_hide_move_restore_during_work(self):
+        from types import SimpleNamespace
+        self.install();self.app._pin_controls();notice=self.app.record_notice
+        self.root.update_idletasks()
+        self.assertIsNotNone(notice.environment_button)
+        self.assertEqual(str(notice.environment_button.cget('state')),'normal')
+        with patch.object(self.app,'_show_his_environment') as open_environment:
+            notice.on_environment=open_environment;notice.environment_button.invoke();open_environment.assert_called_once()
+        notice.set_busy(True);notice.start_drag_at(notice.window.winfo_x()+10,notice.window.winfo_y()+10)
+        recorder=self.app.manager.recorder;recorder.is_recording=True
+        from pynput import mouse
+        with patch.object(self.app,'_is_own_window',return_value=False):
+            recorder._on_mouse_click(5,5,mouse.Button.left,True)
+            self.assertEqual(recorder.actions,[])
+        recorder.is_recording=False
+        self.app.overlay_input.active=True
+        monitor=SimpleNamespace(left=-1920,top=0,right=0,bottom=1080)
+        with patch.object(notice,'_work_area',return_value=monitor):
+            notice.drag_to(-1500,200)
+            self.assertEqual(notice.position,(-1510,190))
+            self.assertEqual(self.app.overlay_input.bounds[0],notice.window.winfo_rootx())
+            self.app._hide_controls();notice.show('Đang chạy','Vẫn tiếp tục',progress=40)
+            self.assertEqual(notice.window.state(),'withdrawn')
+            self.assertTrue(notice.hidden);self.assertEqual(notice.position,(-1510,190))
+            self.assertEqual(self.app.overlay_input.bounds,(0,0,0,0))
+            self.app._toggle_controls()
+            self.assertFalse(notice.hidden);self.assertEqual(notice.window.state(),'normal')
+        self.app.overlay_input.active=False
+
     def test_exit_waits_for_private_worker_then_destroys_root(self):
         engine=Mock();engine.thread.is_alive.side_effect=[True,False]
         self.app.workspace.engine=engine
@@ -395,6 +551,15 @@ class HisUITests(unittest.TestCase):
             engine.close.assert_called_once();destroy.assert_not_called()
             self.app._finish_exit();self.root.update()
             destroy.assert_called_once()
+
+    def test_fast_panel_drag_keeps_only_latest_position_without_queue_backlog(self):
+        before=self.app._ui_events.qsize()
+        for index in range(1000):self.app._queue_panel_drag(index,index+1)
+        self.assertEqual(self.app._ui_events.qsize(),before)
+        with patch.object(self.app.record_notice,'drag_to') as move:
+            self.app._process_ui_events()
+            move.assert_called_once_with(999,1000)
+        self.assertIsNone(self.app._pending_panel_drag)
 
 
 if __name__=='__main__':unittest.main()

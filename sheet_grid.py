@@ -9,11 +9,13 @@ class SheetGrid(tk.Canvas):
         self.page_rows=page_rows;self.max_rows=max_rows
         self.fields=[];self.rows=[];self.start=0;self.selected=None
         self.selection=None
+        self.processed=set();self.current_copy=None
         self.before_scroll=None
         self.on_yview_change=None
         self.font=tkfont.Font(family='Segoe UI',size=10)
         self.header_font=tkfont.Font(family='Segoe UI',size=9,weight='bold')
         self.bind('<Configure>',lambda event:self.draw())
+        self.bind('<Map>',lambda event:self.draw())
         self.bind('<MouseWheel>',self._wheel)
         self.bind('<Shift-MouseWheel>',self._horizontal_wheel)
 
@@ -112,6 +114,8 @@ class SheetGrid(tk.Canvas):
                 field=self.fields[column-1]['id'] if 1<=column<=len(self.fields) else None
                 selected=field is not None and (self.selected==(row,field) or self.selection is not None and self.selection[0]<=row<=self.selection[2] and self.selection[1]<=column-1<=self.selection[3])
                 color='#dfeef6' if selected else '#f5f1e5' if column==0 or row>=self.max_rows else '#fffdf8'
+                if field and (row,field) in self.processed:color='#dfedd6'
+                if field and self.current_copy==(row,field):color='#ffe2a0'
                 self.create_rectangle(left,top,right,top+self.row_height,fill=color,outline='#d7d0c1')
                 if row<self.max_rows:
                     self.create_text(left+6,top+self.row_height/2,anchor='w',text=self.fit_text(value,right-left-10,self.font),font=self.font,fill='#3e3a35')

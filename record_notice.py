@@ -26,7 +26,10 @@ class RecordNotice:
         self._row_height = self._chrome_height = None
         self._resizing = False
         self.environment_enabled = False
+        self.environment_available = True
         self.on_environment = None
+        self.hidden=False;self.on_hide=None;self.on_geometry=None
+        self.moving=False
 
     def pin(self, profiles, on_run, on_stop, on_open, activation='mouse', *, on_repeat=None, size=None, on_resize=None):
         self.pinned = True
@@ -48,9 +51,11 @@ class RecordNotice:
             self.busy = busy
             if self.pinned and self.launcher: self._render_profiles()
 
-    def set_environment_enabled(self, enabled):
-        if self.environment_enabled != enabled:
+    def set_environment_enabled(self, enabled, available=True):
+        if (self.environment_enabled,self.environment_available)!=(enabled,available):
+            if self.environment_enabled!=enabled:self._row_height=self._chrome_height=None
             self.environment_enabled=enabled
+            self.environment_available=available
             if self.pinned and self.launcher:self._render_profiles()
 
     def _render_profiles(self):
@@ -106,13 +111,18 @@ class RecordNotice:
             state='normal' if self.page+1 < pages and not self.busy else 'disabled').pack(side='right')
         footer = ttk.Frame(self.launcher)
         footer.pack(fill='x')
-        ttk.Button(footer, text='Môi trường' if self.environment_enabled else 'Mở ứng dụng', takefocus=False,
-            command=lambda:self.on_environment() if self.environment_enabled and self.on_environment else self.on_open(),
-            state='normal' if self.environment_enabled or not self.busy else 'disabled').pack(side='left')
+        ttk.Button(footer, text='Mở ứng dụng', takefocus=False,command=lambda:self.on_open(),
+            state='normal' if not self.busy else 'disabled').pack(side='left')
         self.stop_button = ttk.Button(footer, text='■ Dừng', style='Danger.TButton', takefocus=False,
             command=lambda:self.on_stop() if self.activation=='mouse' else None,
             state='normal' if self.busy and self.activation=='mouse' else 'disabled')
         self.stop_button.pack(side='right')
+        self.environment_button=None
+        if self.environment_enabled:
+            self.environment_button=ttk.Button(self.launcher,text='Mở môi trường HIS',takefocus=False,
+                command=lambda:self.on_environment() if self.on_environment else None,
+                state='normal' if self.environment_available else 'disabled')
+            self.environment_button.pack(fill='x',pady=(6,0))
         if self.size and self._layout_timer is None:
             self._layout_timer = self.root.after_idle(self._fit_layout)
 
@@ -197,18 +207,36 @@ class RecordNotice:
             grip.bind('<ButtonRelease-1>',self._resize_end)
 
     def _drag_start(self, event):
-        if not self.busy: self._drag = (event.x_root-self.window.winfo_x(), event.y_root-self.window.winfo_y())
+        self.start_drag_at(event.x_root,event.y_root)
+
+    def start_drag_at(self,x,y):
+        if self.window:self._drag=(x-self.window.winfo_x(),y-self.window.winfo_y());self.moving=True
+
+    def end_drag(self,event=None):
+        self.moving=False
 
     def _drag_move(self, event):
-        if self.busy or not hasattr(self, '_drag'): return
-        work = self._work_area()
-        x = max(work.left, min(work.right-self.window.winfo_width(), event.x_root-self._drag[0]))
-        y = max(work.top, min(work.bottom-self.window.winfo_height(), event.y_root-self._drag[1]))
+        self.drag_to(event.x_root,event.y_root)
+
+    def drag_to(self,x,y):
+        if not self.window or not hasattr(self,'_drag'):return
+        work = self._work_area(x,y)
+        x = max(work.left, min(work.right-self.window.winfo_width(), x-self._drag[0]))
+        y = max(work.top, min(work.bottom-self.window.winfo_height(), y-self._drag[1]))
         self.position = (x,y)
         self.window.geometry(f'+{x}+{y}')
+        if self.on_geometry:self.on_geometry()
 
     @staticmethod
-    def _work_area():
+    def _work_area(x=None,y=None):
+        if x is not None and y is not None:
+            class MonitorInfo(ctypes.Structure):
+                _fields_=[('size',wintypes.DWORD),('monitor',wintypes.RECT),('work',wintypes.RECT),('flags',wintypes.DWORD)]
+            user=ctypes.windll.user32
+            user.MonitorFromPoint.argtypes=[wintypes.POINT,wintypes.DWORD];user.MonitorFromPoint.restype=wintypes.HANDLE
+            user.GetMonitorInfoW.argtypes=[wintypes.HANDLE,ctypes.POINTER(MonitorInfo)]
+            info=MonitorInfo();info.size=ctypes.sizeof(info)
+            if user.GetMonitorInfoW(user.MonitorFromPoint(wintypes.POINT(x,y),2),ctypes.byref(info)):return info.work
         work = wintypes.RECT()
         ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(work), 0)
         return work
@@ -234,16 +262,20 @@ class RecordNotice:
             content = tk.Frame(panel, bg=VINTAGE_BG)
             self.content = content
             content.pack(side='left', fill='both', expand=True)
-            self.title = tk.Label(content, bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
+            header=tk.Frame(content,bg=VINTAGE_BG);header.pack(fill='x')
+            self.title = tk.Label(header, bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                                   font=('Segoe UI', 11, 'bold'), anchor='w', wraplength=290, justify='left')
-            self.title.pack(fill='x')
+            self.title.pack(side='left',fill='x',expand=True)
+            self.hide_button=ttk.Button(header,text='×',width=3,takefocus=False,command=lambda:self.on_hide() if self.on_hide else self.hide())
+            self.hide_button.pack(side='right',anchor='n')
             self.title.bind('<Button-1>', self._drag_start)
             self.title.bind('<B1-Motion>', self._drag_move)
+            self.title.bind('<ButtonRelease-1>',self.end_drag)
             self.message = tk.Label(content, bg=VINTAGE_BG, fg=VINTAGE_TEXT_BODY,
                                     font=FONT_BODY, wraplength=290, justify='left', anchor='w')
             self.message.pack(fill='x', pady=(4, 0))
             self.progress = ttk.Progressbar(content, maximum=100, length=280)
-        self.title.configure(text=title)
+        self.title.configure(text=f'{title} · {number}' if self.pinned and number is not None else title)
         self.message.configure(text=message)
         self.number.configure(text=str(number) if number is not None else '●')
         if self.pinned and self.launcher is None:
@@ -275,7 +307,7 @@ class RecordNotice:
         get_style.restype = ctypes.c_ssize_t
         set_style.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
         set_style(hwnd, -20, get_style(hwnd, -20) | 0x08000000 | 0x80)
-        work = self._work_area()
+        work = self._work_area(*self.position) if self.position and self.pinned else self._work_area()
         width, height = win.winfo_reqwidth(), win.winfo_reqheight()
         if self.size and self.pinned:
             scale=self.root.winfo_fpixels('1i')/96
@@ -287,15 +319,24 @@ class RecordNotice:
             x = max(work.left,min(work.right-width,self.position[0]))
             y = max(work.top,min(work.bottom-height,self.position[1]))
         win.geometry(f'{width}x{height}+{x}+{y}')
-        win.deiconify()
-        user32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), x, y, width, height, 0x0050)
+        if not self.hidden or not self.pinned:
+            win.deiconify()
+            user32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), x, y, width, height, 0x0050)
         if self.pinned and not self.busy:
             win.update_idletasks()
             self._fit_layout()
         if duration and not self.pinned:
             self.timer = self.root.after(duration, self.close)
+        if self.on_geometry:self.on_geometry()
+
+    def hide(self):
+        self.end_drag()
+        self.hidden=True
+        if self.window:self.window.withdraw()
+        if self.on_geometry:self.on_geometry()
 
     def close(self, force=False):
+        self.end_drag()
         if self.timer:
             self.root.after_cancel(self.timer)
             self.timer = None

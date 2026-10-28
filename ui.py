@@ -28,7 +28,7 @@ from pathlib import Path
 from ctypes import wintypes
 import tkinter as tk
 from tkinter import ttk, filedialog
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 from screen_capture import capture_region
 from record_notice import RecordNotice
 from overlay_input import OverlayInput
@@ -252,7 +252,7 @@ class HocVetApp:
         self.manager = MacroManager()
         self.his = HisEnvironment(Path(self.manager.library_path).with_name('his_environment.json'))
         self.his_panel = None
-        self.his_tab = None
+        self.his_window = None
         self.manager.prepare_field_data = self.his.prepare
         self._shortcut_dialogs = {}
         self._shortcut_bindings = []
@@ -261,11 +261,13 @@ class HocVetApp:
         self._recorded_count = 0
         self._rendered_record_count = 0
         self._pending_progress = None
+        self._pending_panel_drag = None
         self._last_progress_draw = 0.0
         self._preview_start = 0
         self._preview_profile = None
         self.record_notice = RecordNotice(root)
         self.record_notice.on_environment = self._show_his_environment
+        self.record_notice.on_hide = self._hide_controls
         self._pending_play = None
         self.root._hocvet_app = self
         self._shortcut_commands = {
@@ -296,7 +298,7 @@ class HocVetApp:
         self.manager.on_record_toggle = lambda: self._post(self._toggle_recording)
         self.manager.on_panic = lambda: self._post(self._cmd_emergency_stop)
         self.manager.on_record_stopped = lambda profile, count: self._post(self._record_saved, profile, count)
-        self.manager.recorder.ignore_mouse = self._is_own_window
+        self.manager.recorder.ignore_mouse = lambda x,y:self.record_notice.moving or self._is_own_window(x,y)
         self.manager.recorder.ignore_keyboard = self._is_own_focus
         self.manager.player.protect_mouse = self._is_own_window
         self.manager.player.protect_keyboard = self._is_own_focus
@@ -320,6 +322,7 @@ class HocVetApp:
         self.manager.on_play_finished = lambda success, aborted: self._post(self._on_player_finished, success, aborted)
         self.manager.on_profile_triggered = self._on_profile_triggered
         self.manager.player.on_wait = lambda text: self._post(self._show_wait, text)
+        self.manager.player.on_field_copied=lambda env,field,row:self._post(self._his_field_copied,env,field,row)
 
         # Kích hoạt DPI Awareness
         enable_dpi_awareness()
@@ -327,7 +330,7 @@ class HocVetApp:
         # Cài đặt Theme & Xây dựng Giao diện
         self._setup_retro_styles()
         self._build_ui()
-        self._sync_his_tab()
+        self._sync_his_window()
         self._install_shortcuts()
 
         # Khởi động phím tắt toàn cục
@@ -362,13 +365,16 @@ class HocVetApp:
             except Exception as error:
                 self._set_hud(str(error), BTN_RED_BOT)
                 self.record_notice.show('Không thể thực hiện', str(error), duration=5000)
+        if self._pending_panel_drag is not None:
+            position,self._pending_panel_drag=self._pending_panel_drag,None
+            self.record_notice.drag_to(*position)
         if self.manager.state == MacroManager.STATE_RECORDING and self._recorded_count != self._rendered_record_count:
             count = self._recorded_count
             self.lbl_stats.configure(text=f'Đang học · {count:,} thao tác · phím dừng: {self.manager.button_hotkeys.get("stop_record") or self.manager.hotkey_record_str}')
             self._rendered_record_count = count
         if hasattr(self, 'workspace'): self.workspace.poll_frame()
         self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
-        self.record_notice.set_environment_enabled(self.manager.state==MacroManager.STATE_RECORDING and self.his.installed)
+        self.record_notice.set_environment_enabled(self.his.installed,self.manager.state in (MacroManager.STATE_IDLE,MacroManager.STATE_RECORDING) and not self.manager.external_busy and self._pending_play is None)
         if self.overlay_input.active and self.manager.state != MacroManager.STATE_PLAYING:
             self.overlay_input.deactivate()
         now = time.monotonic()
@@ -459,6 +465,7 @@ class HocVetApp:
         menu.add_command(label='Thoát toàn bộ',command=self._exit_app)
         menu.add_command(label='Hướng dẫn', command=self._cmd_help)
         menu.add_command(label='Thư mục dữ liệu', command=lambda: os.startfile(os.path.dirname(self.manager.library_path)))
+        menu.add_command(label='Mở / ẩn bảng điều khiển',command=self._toggle_controls)
         self.root.configure(menu=menu)
         self.status_banner = tk.Label(self.root, text='SẴN SÀNG', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                                       font=('Segoe UI', 10, 'bold'), pady=8, wraplength=700)
@@ -475,6 +482,12 @@ class HocVetApp:
                              (self.work_tab, 'Công việc riêng'), (self.settings_tab, 'Cài đặt'),
                              (self.extensions_tab,'Tính năng mở rộng'),(self.exit_tab,'Thoát toàn bộ')):
             self.tabs.add(frame, text=label)
+        font=ImageFont.truetype('segoeuib.ttf',max(10,round(self.root.winfo_fpixels('9p'))))
+        bounds=font.getbbox('Thoát toàn bộ')
+        image=Image.new('RGB',(bounds[2]-bounds[0]+16,bounds[3]-bounds[1]+8),BTN_RED_BOT)
+        ImageDraw.Draw(image).text((8-bounds[0],4-bounds[1]),'Thoát toàn bộ',font=font,fill=BTN_RED_TXT)
+        self._exit_tab_image=ImageTk.PhotoImage(image,master=self.root)
+        self.tabs.tab(self.exit_tab,image=self._exit_tab_image,compound='image')
         self.tabs.bind('<<NotebookTabChanged>>', self._tab_changed)
         self._settings_built = False
         self._settings_bindings = []
@@ -494,6 +507,8 @@ class HocVetApp:
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_open_settings).pack(side=tk.RIGHT)
         Retro3DButton(header, text='Thu vào khay', width=105, height=32, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._hide_to_tray).pack(side=tk.RIGHT, padx=8)
+        Retro3DButton(header,text='Bảng điều khiển',width=125,height=32,top_color=BTN_BEIGE_TOP,
+                      bot_color=BTN_BEIGE_BOT,text_color=BTN_BEIGE_TXT,command=self._toggle_controls).pack(side=tk.RIGHT)
         select = self._create_section_card(self.content, '01  CHỌN KỊCH BẢN')
         choice_row = tk.Frame(select, bg=VINTAGE_CARD_BG)
         choice_row.pack(fill=tk.X)
@@ -635,6 +650,8 @@ class HocVetApp:
 
         def _action_open(icon, item):
             self._post(self._show_from_tray)
+        def _action_controls(icon,item):
+            self._post(self._toggle_controls)
 
         def _action_panic(icon, item):
             if self.manager.script_activation=='mouse': self._post(self._cmd_emergency_stop)
@@ -644,6 +661,7 @@ class HocVetApp:
 
         tray_menu = pystray.Menu(
             pystray.MenuItem("📌 Mở giao diện chính", _action_open, default=True),
+            pystray.MenuItem('Bảng điều khiển · Mở / ẩn',_action_controls),
             pystray.MenuItem("🛑 Dừng công việc", _action_panic, enabled=lambda item:self.manager.script_activation=='mouse'),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("❌ Thoát ứng dụng", _action_exit),
@@ -662,6 +680,7 @@ class HocVetApp:
         """Ẩn cửa sổ xuống khay hệ thống."""
         if self._closing:return
         self.root.withdraw()
+        if self.his_window:self.his_window.withdraw()
         self.workspace.set_visible(False)
         self._pin_controls()
 
@@ -670,7 +689,39 @@ class HocVetApp:
             self._show_from_tray, self.manager.script_activation, on_repeat=self._set_panel_repeat,
             size=self.manager.panel_size, on_resize=self._save_panel_size)
         self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
-        self.record_notice.set_environment_enabled(self.manager.state==MacroManager.STATE_RECORDING and self.his.installed)
+        self.record_notice.set_environment_enabled(self.his.installed,self.manager.state in (MacroManager.STATE_IDLE,MacroManager.STATE_RECORDING) and not self.manager.external_busy and self._pending_play is None)
+        self.record_notice.on_geometry=self._sync_overlay_geometry
+        self._sync_overlay_geometry()
+
+    def _toggle_controls(self):
+        if self._closing:return
+        notice=self.record_notice
+        if notice.pinned and notice.window and notice.window.winfo_ismapped() and not notice.hidden:
+            self._hide_controls()
+        else:
+            notice.hidden=False;self._pin_controls()
+
+    def _hide_controls(self):
+        self.record_notice.hide();self._sync_overlay_geometry()
+
+    def _sync_overlay_geometry(self):
+        route=self.overlay_input;notice=self.record_notice
+        if not route.active:return
+        win=notice.window
+        if not win or not win.winfo_ismapped():
+            route.bounds=route.stop_bounds=route.close_bounds=route.drag_bounds=(0,0,0,0);return
+        win.update_idletasks()
+        def bounds(widget):
+            return (widget.winfo_rootx(),widget.winfo_rooty(),widget.winfo_rootx()+widget.winfo_width(),widget.winfo_rooty()+widget.winfo_height())
+        route.bounds=bounds(win);route.stop_bounds=bounds(notice.stop_button)
+        route.close_bounds=bounds(notice.hide_button);route.drag_bounds=bounds(notice.title)
+        route.on_hide=lambda:self._post(self._hide_controls)
+        route.on_drag_start=lambda x,y:self._post(notice.start_drag_at,x,y)
+        route.on_drag_move=self._queue_panel_drag
+        route.on_drag_end=lambda:self._post(notice.end_drag)
+
+    def _queue_panel_drag(self,x,y):
+        if not self._closing:self._pending_panel_drag=(x,y)
 
     def _set_his_installed(self,installed):
         if self._closing:return
@@ -680,29 +731,35 @@ class HocVetApp:
         try:self.his.update(installed=installed)
         except (OSError,ValueError) as error:
             self.notify_app('Chưa đổi được tiện ích',str(error));return
-        self._sync_his_tab()
+        self._sync_his_window()
         self.extensions.refresh()
-        if installed:self._show_his_environment()
-        else:self.tabs.select(self.extensions_tab)
+        self.record_notice.set_environment_enabled(self.his.installed)
+        self.notify_app('Đã cài đặt tiện ích' if installed else 'Đã gỡ tiện ích',
+            'Hỗ trợ ĐK KCB HIS đã sẵn sàng. Mở môi trường thao tác để bắt đầu.' if installed else 'Đã tắt công cụ và đóng môi trường. Dữ liệu bảng được giữ để cài lại.')
+        return True
 
-    def _sync_his_tab(self):
+    def _sync_his_window(self):
         if self.his.installed and self.his_panel is None:
-            self.his_tab=tk.Frame(self.tabs,bg=VINTAGE_BG)
-            self.tabs.add(self.his_tab,text='Môi trường thao tác')
-            self.his_panel=HisPanel(self.his_tab,self)
+            win=self.his_window=tk.Toplevel(self.root);win.withdraw()
+            win.title('Học Vẹt · Môi trường thao tác HIS');win.geometry('1000x780');win.minsize(760,660)
+            win.configure(bg=VINTAGE_BG);win.protocol('WM_DELETE_WINDOW',self._hide_his_environment)
+            self.his_panel=HisPanel(win,self)
         elif not self.his.installed and self.his_panel:
-            self.tabs.forget(self.his_tab);self.his_tab.destroy()
-            self.his_panel=self.his_tab=None
+            self.his_panel.end_drag();self.his_window.destroy()
+            self.his_panel=self.his_window=None
+
+    def _hide_his_environment(self):
+        if not self.his_window:return
+        self.his_panel.commit_editor();self.his_window.withdraw()
+        if self.manager.state==MacroManager.STATE_RECORDING:self._pin_controls()
 
     def _show_his_environment(self):
         if self._closing:return
         if not self.his.installed or not self.his_panel:
-            self.notify_app('Chưa cài tiện ích','Cài Hỗ trợ ĐK KCB HIS ở tab Tính năng mở rộng.');return
+            self.notify_app('Chưa cài tiện ích','Cài Hỗ trợ ĐK KCB HIS ở mục Tính năng mở rộng.');return
         if self.manager.state not in (MacroManager.STATE_IDLE,MacroManager.STATE_RECORDING) or self.manager.external_busy or self._pending_play is not None:return
-        self.root.deiconify();self.tabs.select(self.his_tab);self.root.lift();self.root.focus_force()
-        if self.manager.state==MacroManager.STATE_RECORDING and self.record_notice.window:
-            self.record_notice.window.withdraw()
-        self.his_panel.sync_state()
+        self.his_window.deiconify();self.his_window.lift();self.his_window.focus_force()
+        self.his_panel.sync_state();self.his_panel.refresh()
 
     def _set_panel_repeat(self, profile_id, value=None):
         if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
@@ -761,6 +818,7 @@ class HocVetApp:
     def _exit_app(self):
         """Thoát hoàn toàn ứng dụng."""
         if self._closing:return
+        self.extensions.cancel_installation()
         if self.his_panel:self.his_panel.commit_editor()
         self._closing = True
         self.manager.stop_global_hotkeys()
@@ -1308,14 +1366,16 @@ class HocVetApp:
 
     def _cmd_start_recording(self, force_countdown=False, from_hotkey=False):
         if self._closing:return
+        if self.extensions.busy:return
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
         if self.his_panel and self.his_panel.editor:return
         if self._pending_play is not None: return
         if self.manager.external_busy: return
         if self.manager.state != MacroManager.STATE_IDLE or self.countdown_timer:
             return
+        self.record_notice.hidden=False
         if self.manager.script_activation == 'mouse':
-            if self.his_tab and self.tabs.select()==str(self.his_tab):self._pin_controls()
+            if self.his_window and self.his_window.winfo_ismapped():self._pin_controls()
             else:self._hide_to_tray()
         if force_countdown or self.countdown_var.get():
             self.manager._set_state(MacroManager.STATE_COUNTDOWN)
@@ -1328,6 +1388,7 @@ class HocVetApp:
         if self._closing or self.manager.state != MacroManager.STATE_COUNTDOWN:
             return
         if seconds_left > 0:
+            if self.his_panel:self.his_panel.show_countdown(seconds_left)
             self._set_hud(f'Bắt đầu học sau {seconds_left} giây · nhấn phím dừng để hủy', BTN_RED_BOT)
             self.record_notice.show('Sắp bắt đầu học thao tác', 'Chuyển sang phần mềm cần thao tác. Bấm Dừng để hủy.' if self.manager.script_activation == 'mouse'
                 else 'Chuyển sang phần mềm cần thao tác. Phím dừng có thể hủy đếm ngược.', number=seconds_left)
@@ -1338,7 +1399,9 @@ class HocVetApp:
     def _do_start_record(self):
         if self.manager.state not in (MacroManager.STATE_IDLE, MacroManager.STATE_COUNTDOWN):
             return
+        self.record_notice.end_drag()
         self._recorded_count = self._rendered_record_count = 0
+        if self.his_panel:self.his_panel.reset_progress()
         self._clear_tree()
         self.lbl_stats.configure(text='Đang học · 0 thao tác')
         self.manager.start_recording(record_movement=not self.ignore_movement_var.get())
@@ -1347,8 +1410,7 @@ class HocVetApp:
         name = active.name if active else 'Kịch bản'
         instruction = 'Bấm Dừng ở bảng nổi để lưu.' if self.manager.script_activation == 'mouse' else f'Nhấn [{stop}] để dừng và lưu.'
         self.record_notice.show('ĐANG HỌC THAO TÁC', f'{name} · {instruction}', duration=3500)
-        if self.his_tab and self.tabs.select()==str(self.his_tab) and self.root.state()!='withdrawn':
-            self.record_notice.window.withdraw()
+        if self.his_window and self.his_window.winfo_ismapped():self.his_panel.sync_state()
 
     def _cancel_countdown(self):
         if self.countdown_timer:
@@ -1375,6 +1437,7 @@ class HocVetApp:
 
     def _cmd_start_playing(self, from_hotkey=False):
         if self._closing:return
+        if self.extensions.busy:return
         if (self.manager.script_activation == 'hotkey') != from_hotkey: return
         if self._shortcut_dialogs: return
         if self.his_panel and self.his_panel.editor:return
@@ -1411,6 +1474,7 @@ class HocVetApp:
                 self.notify_app('Chưa thể chạy', str(error))
                 return
             self.manager.start_playing_profile(active)
+            self._sync_overlay_geometry()
             instruction = 'Bấm Dừng để kết thúc.' if self.manager.script_activation=='mouse' else f'Nhấn [{self.manager.hotkey_panic_str}] để dừng.'
             self.notify_app('Đang chạy kịch bản', f'{active.name} · {instruction}', progress=0)
         self._pending_play = self.root.after(200, start)
@@ -1450,6 +1514,7 @@ class HocVetApp:
         self._post(self._run_from_panel, profile.id, True)
 
     def _handle_state_ui(self, state: str):
+        if self.his_panel and state==MacroManager.STATE_PLAYING:self.his_panel.reset_progress()
         if self.his_panel:self.his_panel.sync_state()
         idle = state == MacroManager.STATE_IDLE and not self.manager.external_busy
         self.profile_choice.configure(state='readonly' if idle else 'disabled')
@@ -1504,6 +1569,9 @@ class HocVetApp:
     def _on_player_step(self, step: int, total: int, cur_loop: int, total_loops: int):
         self._pending_progress = (step, total, cur_loop, total_loops)
 
+    def _his_field_copied(self,environment_id,field_id,row):
+        if self.his_panel:self.his_panel.mark_copied(environment_id,field_id,row)
+
     def _draw_player_step(self, step, total, cur_loop, total_loops):
         active = self.manager.get_active_profile()
         p_name = active.name if active else ""
@@ -1513,10 +1581,13 @@ class HocVetApp:
         percent = ((cur_loop-1)*total+step)/max(1, total*total_loops)*100 if total_loops else step/max(1,total)*100
         base=self.manager.player.data_start_row
         row_info=f' · STT {base+cur_loop-1}' if base else ''
+        if self.his_panel and base and self.his_panel.latest_row==base+cur_loop-1:
+            row_info=f' · {self.his_panel.latest_copy}'
         self.notify_app('Đang chạy kịch bản', f'{p_name}{row_info} · Bước {step}/{total} · Vòng {cur_loop}', progress=percent)
 
     def _on_player_finished(self, success: bool, aborted: bool):
         self._pending_progress = None
+        if self.his_panel:self.his_panel.finish_progress(success and not aborted)
         active = self.manager.get_active_profile()
         p_name = active.name if active else ""
         if self.manager.player.last_error:
@@ -1744,15 +1815,18 @@ Cập nhật / thay file ứng dụng không xóa thư viện. File .bak giữ l
 11. Web cần Microsoft Edge; trình duyệt dùng hồ sơ riêng. Windows chỉ hỗ trợ ô nhập Edit/RichEdit và nút chuẩn trong một cửa sổ tương thích, không thu nhỏ cửa sổ đích. HIS dùng điều khiển tùy biến, popup hoặc không cung cấp ảnh cần phiên Windows / máy ảo riêng để chạy độc lập hoàn toàn. Chế độ này không chuyển sang điều khiển chuột thật.
 12. Dùng Tab, Enter / Space để thao tác. Vào Cài đặt để gán phím cho các nút, kể cả công việc riêng; chọn Trong ứng dụng / Toàn cục. Phím Dừng học hoặc Dừng khẩn cấp cũng dừng công việc riêng.
 13. Bấm Chạy sẽ thu vào khay trước rồi bắt đầu. Bảng nổi luôn có tiến trình và kịch bản bên dưới; bấm Chạy từng dòng, Trước / Sau hoặc lăn chuột để chuyển trang. Dừng vẫn dùng được khi đang chạy; nút Mở ứng dụng dùng sau khi đã dừng.
-14. Kéo tiêu đề bảng khi rảnh để đổi vị trí. Khi phát, chuột của kịch bản xuyên qua bảng tới cửa sổ bên dưới, không làm dừng kịch bản hoặc bấm các nút trên bảng. Ở chế độ chuột, chỉ cú bấm chuột thật vào Dừng mới dừng; ở chế độ phím dùng phím Dừng đã gán. Sau khi phát xong bảng nhận chuột trở lại.
+14. Kéo tiêu đề bảng để đổi vị trí. Nút × chỉ ẩn bảng; mở lại bằng nút Bảng điều khiển trên màn hình chính hoặc menu khay. Khi phát, chuột của kịch bản xuyên qua bảng tới cửa sổ bên dưới, không làm dừng kịch bản hoặc bấm các nút trên bảng. Ở chế độ chuột, chỉ cú bấm chuột thật vào Dừng mới dừng; ở chế độ phím dùng phím Dừng đã gán. Sau khi phát xong bảng nhận chuột trở lại.
 15. Dưới mỗi kịch bản trên bảng nổi có −/+, bấm vào số để nhập số lần lặp. 0 là lặp liên tục. Mỗi kịch bản giữ số riêng, tự lưu và đồng bộ với màn hình chính.
 16. Kéo cạnh / góc bảng nổi để đổi chiều rộng, chiều cao. Số kịch bản mỗi trang tự điều chỉnh; kích thước được ghi nhớ khi thả chuột. Chỉ chỉnh lặp / kích thước khi đã dừng để giữ vùng bấm xuyên bảng ổn định.
-17. Vào Tính năng mở rộng → Cài Hỗ trợ ĐK KCB HIS để mở tab Môi trường thao tác. Nhấn + để thêm trường; chọn ô rồi Ctrl+V hoặc Dán dữ liệu. Mỗi dòng trong danh sách vào một STT: chọn ô Họ và tên ở STT 1, dán 10 tên sẽ điền STT 1–10. Dán nhiều cột từ Excel không gồm STT / tiêu đề. Bảng giữ số 0 đầu và định dạng ngày. Dùng thanh cuộn / con lăn xem hàng, thanh ngang / Shift + con lăn xem cột.
+17. Vào Tính năng mở rộng → Cài Hỗ trợ ĐK KCB HIS rồi bấm Mở môi trường thao tác để mở cửa sổ riêng. Nhấn + để thêm trường; chọn ô rồi Ctrl+V hoặc Dán dữ liệu. Mỗi dòng trong danh sách vào một STT: chọn ô Họ và tên ở STT 1, dán 10 tên sẽ điền STT 1–10. Dán nhiều cột từ Excel không gồm STT / tiêu đề. Bảng giữ số 0 đầu và định dạng ngày. Dùng thanh cuộn / con lăn xem hàng, thanh ngang / Shift + con lăn xem cột.
 18. Chọn Học với bảng (hoặc F8 ở chế độ phím). Khi đang học, nhấp đúp / Sao chép ở STT 1, quay về HIS và dán; bấm Môi trường ở bảng nổi để lấy trường tiếp theo cùng STT. Dừng để lưu rồi chọn số lần chạy: mỗi vòng lấy hàng tiếp theo. Ví dụ 7 vòng lấy STT 1–7. Với kịch bản dùng bảng, 0 vòng chạy đến hàng cuối có dữ liệu. Thiếu hàng / trường / ô trống sẽ được báo trước khi chạy.
-19. Gỡ công cụ sẽ ẩn tab nhưng giữ bảng để cài lại. Dữ liệu ở his_environment.json trong thư mục dữ liệu ứng dụng; kịch bản chia sẻ chỉ chứa tham chiếu trường, không chứa các hàng đã nhập. Máy nhận cần tạo trường cùng tên và nhập bảng riêng. Kịch bản cũ lấy tọa độ bảng cần học lại các bước lấy dữ liệu trong Môi trường thao tác.
-20. Chọn tab Thoát toàn bộ cạnh Tính năng mở rộng để dừng / lưu, chờ các công việc đóng xong và thoát hẳn; không thu vào khay. Menu Thoát toàn bộ cũng dùng cùng lệnh này.
+19. Gỡ công cụ sẽ đóng cửa sổ môi trường và bỏ nút mở trên bảng điều khiển, nhưng giữ bảng để cài lại. Dữ liệu ở his_environment.json trong thư mục dữ liệu ứng dụng; kịch bản chia sẻ chỉ chứa tham chiếu trường, không chứa các hàng đã nhập. Máy nhận cần tạo trường cùng tên và nhập bảng riêng. Kịch bản cũ lấy tọa độ bảng cần học lại các bước lấy dữ liệu trong cửa sổ Môi trường thao tác.
+20. Chọn tab Thoát toàn bộ màu đỏ ở cuối cùng bên phải để dừng / lưu, chờ các công việc đóng xong và thoát hẳn; không thu vào khay. Menu Thoát toàn bộ cũng dùng cùng lệnh này.
 21. Trong Môi trường thao tác, + Tạo mới tạo bảng riêng và giữ bảng cũ. Chọn bảng bằng danh sách Bảng. Kịch bản vẫn lấy đúng bảng chứa trường đã học dù đang xem bảng khác. Khi học hoặc chạy không đổi môi trường.
 22. Kéo chuột hoặc Shift + chọn để quét ô; Ctrl+A chọn tất cả, Ctrl+C sao chép vùng, Delete / Xóa vùng chọn xóa nội dung và giữ STT / trường. Làm trống bảng sẽ hỏi xác nhận, chỉ xóa dữ liệu bảng hiện tại, giữ cột và các bảng khác.
+23. Chọn tiêu đề / ô rồi mở Trường dữ liệu hoặc nhấp chuột phải: thêm, đổi tên, chuyển trái / phải, xóa cột. Xóa cột có xác nhận; kịch bản dùng trường đã xóa phải học lại. Học với bảng luôn đếm ngược 3–2–1 và Dừng học có thể hủy trước khi ghi.
+24. Khi chạy, bảng nổi hiện STT / trường vừa lấy; mở lại bảng xem ô vàng vừa lấy hoặc dừng tới, xanh đã đi qua. Lượt mới / sửa dữ liệu xóa dấu cũ. Màu chỉ theo dõi việc sao chép, không xác nhận kết quả nhập HIS.
+25. Tính năng mở rộng có tiến trình cài / gỡ và thông báo hoàn tất; công cụ đi kèm ứng dụng, không tải mạng. Môi trường thao tác là cửa sổ riêng, đóng [X] chỉ ẩn cửa sổ. Bảng điều khiển có nút Mở môi trường HIS sau khi cài.
 
 Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; kiểm tra nội dung trước khi chia sẻ.
 """)

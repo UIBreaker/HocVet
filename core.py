@@ -429,6 +429,7 @@ class MacroPlayer:
         self.protect_keyboard = None
         self.on_input_finished = None
         self.field_reader = None
+        self.on_field_copied = None
         self.current_loop = 1
         self.data_start_row = None
         self._held_buttons = set()
@@ -567,6 +568,9 @@ class MacroPlayer:
             if not self.field_reader: raise RuntimeError('Chưa có bảng dữ liệu cho kịch bản HIS.')
             value=self.field_reader(action.data_field,action.data_row+self.current_loop-1)
             set_clipboard_text(value,self._abort_event)
+            if self.on_field_copied:
+                self.on_field_copied(getattr(self.field_reader,'environment_id',None),
+                    getattr(self.field_reader,'field_ids',{}).get(action.data_field,action.data_field),action.data_row+self.current_loop-1)
         elif act_type in ('wait_window', 'wait_image'):
             if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
                 raise ValueError('Thời gian chờ phải từ 0 đến 3600 giây.')

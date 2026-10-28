@@ -109,6 +109,7 @@ class WorkspacePanel:
 
     def _available(self):
         if self.app._closing:return False
+        if getattr(getattr(self.app,'extensions',None),'busy',False):return False
         if self.app.manager.state != self.app.manager.STATE_IDLE:
             self.app.notify_app('Hãy dừng kịch bản màn hình trước', 'Không chạy đồng thời hai chế độ nhập liệu.')
             return False

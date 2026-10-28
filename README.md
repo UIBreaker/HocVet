@@ -1,21 +1,22 @@
-# Học Vẹt · v0.18.0
+# Học Vẹt · v0.20.0
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.18.0
+## Có gì mới trong 0.20.0
 
-- Lưu **nhiều môi trường HIS** có tên riêng; tự chuyển dữ liệu cũ và chạy đúng bảng đã học.
-- Quét vùng bằng kéo chuột / Shift; **Ctrl+A**, **Ctrl+C**, **Delete** và **Làm trống bảng** có xác nhận.
-- Bảng cuộn dọc / ngang, **Ctrl+V** dán danh sách hoặc nhiều cột từ Excel, giữ tiếng Việt và số 0 đầu.
-- **Thoát toàn bộ** thành tab riêng; khóa sửa bảng khi học / chạy và giữ dữ liệu nếu lưu thất bại.
+- Cài / gỡ tiện ích có tiến trình và thông báo hoàn tất; giữ dữ liệu khi gỡ.
+- **Môi trường thao tác HIS** mở trong cửa sổ riêng, mở lại từ tiện ích hoặc bảng điều khiển.
+- Mở / ẩn và kéo bảng điều khiển ngay khi đang chạy; ẩn bảng vẫn tiếp tục công việc.
+- Tùy chỉnh cột dữ liệu, học có đếm ngược **3–2–1**, tô màu các ô đã lấy theo từng vòng.
+- **Thoát toàn bộ** luôn ở cuối thanh tab, nền đỏ chữ trắng.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.18.0-Windows.zip** tại [bản phát hành 0.18.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.18.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.20.0-Windows.zip** tại [bản phát hành 0.20.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.20.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản cũ trước khi mở EXE mới. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -51,14 +52,16 @@ Nếu không lưu được thư viện, ứng dụng báo lỗi và giữ nguyê
 
 Khi bấm **Chạy**, Học Vẹt thu vào khay trước rồi bắt đầu phát sau khoảng 0,2 giây để cửa sổ công việc nhận lại tiêu điểm. Bảng nổi không lấy tiêu điểm; phần trên là tiến trình, phần dưới có tên, số bước và nút **Chạy** cho từng kịch bản màn hình. Chọn **Trước / Sau** hoặc lăn chuột để chuyển trang. Bảng giữ nguyên khi hoàn tất, sẵn sàng cho lượt tiếp theo. Kịch bản rỗng / bị tắt không chạy được.
 
+**Đóng / mở bảng:** bấm × trên bảng để ẩn; công việc vẫn chạy. Mở lại bằng **Bảng điều khiển** trên màn hình chính hoặc menu **Bảng điều khiển · Mở / ẩn** trong khay hệ thống. Thông báo tiến độ không tự bật lại bảng đã ẩn. Có thể dừng bằng menu khay; bắt đầu lượt học mới sẽ hiển thị đếm ngược. Vị trí được giữ khi ẩn / mở trong cùng phiên ứng dụng.
+
 **Cài đặt → Kích hoạt kịch bản** có hai lựa chọn:
 
 - **Bấm chuột ở bảng nổi** (mặc định): tắt toàn bộ phím đã gán, kể cả Dừng khẩn cấp và phím riêng của kịch bản. Gõ số từng gán để dừng sẽ không ngắt công việc. Bấm **Học thao tác** trên màn hình chính để học, rồi **Dừng** ở bảng nổi để lưu. Không xóa cấu hình phím đã gán.
 - **Dùng phím đã gán**: bật các phím đó và khóa nút Học / Chạy / Dừng bằng chuột ở màn hình chính, bảng nổi và tab Công việc. Phím **Dừng khẩn cấp** chỉ hoạt động trong chế độ này.
 
-Kéo tiêu đề bảng để đổi vị trí khi đang rảnh. Bảng giữ nguyên vị trí khi phát. Các nút Chạy / chuyển trang / Mở ứng dụng bị khóa trong lúc chạy; **Dừng** bằng chuột chỉ dùng được ở chế độ chuột. Bấm **Mở ứng dụng** khi đã dừng để trở về màn hình chính.
+Kéo tiêu đề bảng để đổi vị trí theo ý muốn, kể cả khi đang chạy. Khi bảng di chuyển, vùng nút Dừng và vùng nhận chuột được cập nhật theo vị trí mới. Các nút Chạy / chuyển trang / Mở ứng dụng bị khóa trong lúc chạy; **Dừng** bằng chuột chỉ dùng được ở chế độ chuột. Bấm **Mở ứng dụng** khi đã dừng để trở về màn hình chính. Khi cài HIS, bảng có thêm **Mở môi trường HIS**, dùng khi rảnh hoặc đang học; trong lúc chạy nút này khóa để giữ tiêu điểm cho phần mềm đích.
 
-Bấm vào bảng không được ghi thành thao tác. Khi phát macro màn hình, bảng vẫn hiển thị nhưng nhận diện chuột xuyên qua; cú bấm / cuộn được gửi tới cửa sổ bên dưới tại đúng tọa độ. Bộ lọc riêng chỉ nhận cú bấm chuột thật vào Dừng ở chế độ chuột, không nhận cú bấm do kịch bản phát ra. Các cú bấm tay khác trên bảng trong lúc phát được chặn để không bấm nhầm xuống cửa sổ bên dưới. Sau khi hàng đợi chuột hoàn tất, bảng nhận chuột trở lại. Kiểm tra bàn phím vẫn dừng nếu cửa sổ Học Vẹt bất ngờ nhận tiêu điểm. Macro màn hình vẫn dùng chuột thật của Windows; dùng tab Công việc riêng khi cần nhập liệu độc lập.
+Bấm vào bảng không được ghi thành thao tác. Khi phát macro màn hình, bảng vẫn hiển thị nhưng nhận diện chuột xuyên qua; cú bấm / cuộn được gửi tới cửa sổ bên dưới tại đúng tọa độ. Bộ lọc nhận chuột thật để kéo tiêu đề, ẩn bảng và bấm Dừng ở chế độ chuột; thao tác do kịch bản phát không kích hoạt các nút này. Các cú bấm tay khác trên bảng trong lúc phát được chặn để không bấm nhầm xuống cửa sổ bên dưới. Sau khi hàng đợi chuột hoàn tất, bảng nhận chuột trở lại. Kiểm tra bàn phím vẫn dừng nếu cửa sổ Học Vẹt bất ngờ nhận tiêu điểm. Macro màn hình vẫn dùng chuột thật của Windows; dùng tab Công việc riêng khi cần nhập liệu độc lập.
 
 ![Bảng nổi tiến trình và kịch bản](docs/images/tray-panel.png)
 
@@ -112,30 +115,42 @@ Kịch bản có thể chứa nội dung đã gõ và ảnh chụp màn hình; k
 
 ## Hỗ trợ ĐK KCB HIS (v0.17)
 
-1. Mở tab **Tính năng mở rộng** cạnh Cài đặt → **Cài đặt** công cụ **Hỗ trợ ĐK KCB HIS**. Tab **Môi trường thao tác** sẽ xuất hiện.
-2. Bấm **+** ở tiêu đề (hoặc **+ Trường dữ liệu**) để thêm Họ và tên, Ngày sinh, Giới tính, Địa chỉ, CCCD, SĐT… STT là số hàng tự động, không nhập / đổi thành trường khác. Nhấp đúp ô để nhập, Enter để lưu, Esc hủy; phím mũi tên để chuyển ô. Có thể chọn ô bắt đầu rồi **Dán dữ liệu · Ctrl+V**: chỉ chọn dữ liệu, không gồm STT hoặc dòng tiêu đề. Thêm đủ trường trước khi dán. Dữ liệu được giữ dạng văn bản, không tự chuyển ngày hay bỏ số 0 đầu.
+1. Mở tab **Tính năng mở rộng** cạnh Cài đặt → **Cài đặt** công cụ **Hỗ trợ ĐK KCB HIS**. Bấm **Mở môi trường thao tác** để mở cửa sổ riêng. Không thêm tab mới vào màn hình chính.
+2. Bấm **+** ở tiêu đề (hoặc **Trường dữ liệu → Thêm trường**) để thêm Họ và tên, Ngày sinh, Giới tính, Địa chỉ, CCCD, SĐT… STT là số hàng tự động, không nhập / đổi thành trường khác. Nhấp đúp ô để nhập, Enter để lưu, Esc hủy; phím mũi tên để chuyển ô. Có thể chọn ô bắt đầu rồi **Dán dữ liệu · Ctrl+V**: chỉ chọn dữ liệu, không gồm STT hoặc dòng tiêu đề. Thêm đủ trường trước khi dán. Dữ liệu được giữ dạng văn bản, không tự chuyển ngày hay bỏ số 0 đầu.
 3. Chọn / tạo kịch bản, mở Môi trường thao tác rồi **Học với bảng** ở chế độ chuột. Nếu dùng chế độ phím, nhấn phím Học đã gán (mặc định F8). Chờ đếm ngược xong.
-4. Nhấp đúp ô hoặc bấm **Sao chép** ở STT 1. Ứng dụng ghi một bước lấy trường, thu cửa sổ bảng để bạn quay về HIS, bấm đúng ô đích và dán. Dùng nút **Môi trường** trên bảng nổi để trở về lấy trường tiếp theo **cùng STT 1**. Các cú bấm / Ctrl+C trong bảng không bị lưu thành tọa độ; thao tác dán, chọn ô và xử lý bên HIS vẫn được học bình thường.
-5. **Dừng học** trong tab, nút **Dừng** trên bảng nổi hoặc phím dừng theo chế độ để lưu. Chọn số lần chạy rồi Chạy: học ở STT 1 và chạy 7 lần sẽ lấy lần lượt STT 1–7. Nếu học bắt đầu STT 3 thì các vòng lấy STT 3, 4, 5…
+4. Nhấp đúp ô hoặc bấm **Sao chép** ở STT 1. Ứng dụng ghi một bước lấy trường, thu cửa sổ bảng để bạn quay về HIS, bấm đúng ô đích và dán. Dùng nút **Mở môi trường HIS** trên bảng điều khiển để trở về lấy trường tiếp theo **cùng STT 1**. Các cú bấm / Ctrl+C trong bảng không bị lưu thành tọa độ; thao tác dán, chọn ô và xử lý bên HIS vẫn được học bình thường.
+5. **Dừng học** trong cửa sổ môi trường, nút **Dừng** trên bảng nổi hoặc phím dừng theo chế độ để lưu. Chọn số lần chạy rồi Chạy: học ở STT 1 và chạy 7 lần sẽ lấy lần lượt STT 1–7. Nếu học bắt đầu STT 3 thì các vòng lấy STT 3, 4, 5…
 6. Kịch bản dùng bảng chọn **0 lần** sẽ chạy đến hàng cuối có dữ liệu rồi kết thúc. Các hàng trống hoàn toàn ở cuối được bỏ qua khi tính số hàng. Thiếu hàng, thiếu trường hoặc ô bắt buộc trống sẽ được báo **trước thao tác đầu tiên**; không dùng lại clipboard của hàng trước. Một kịch bản phải học tất cả trường từ cùng một STT để tránh trộn hàng.
 
 Chọn ô cần bắt đầu rồi **Ctrl+V** hoặc **Dán dữ liệu**. Ví dụ sao chép 10 tên, mỗi tên một dòng, chọn ô Họ và tên tại STT 1 rồi dán: dữ liệu điền lần lượt STT 1–10. Có thể dán một cột vào giữa bảng mà giữ các cột khác. Thanh cuộn dọc / con lăn để xem hàng, thanh ngang / Shift + con lăn để xem cột; không cần chuyển trang. Tiêu đề giữ nguyên khi cuộn dọc. Đang học chỉ sao chép, không sửa dữ liệu. Khi phát, bảng có thể đóng; ứng dụng dùng bản chụp dữ liệu cho lượt chạy đó.
+
+**Tùy chỉnh trường:** chọn tiêu đề / ô trong cột rồi mở **Trường dữ liệu ▾**, hoặc nhấp chuột phải. Có thể thêm, đổi tên, chuyển trái / phải, xóa cột sau xác nhận. Đổi tên / vị trí giữ mã trường và dữ liệu. Xóa cột xóa dữ liệu cột đó, giữ cột khác và bảng khác; kịch bản dùng trường bị xóa phải học lại bước lấy dữ liệu, không tự chuyển sang bảng khác. Không chỉnh trường khi đang học / chạy.
+
+**Đếm ngược và tiến độ:** Học với bảng luôn có 3–2–1, có thể bấm Dừng học để hủy; chưa ghi trước khi hết đếm ngược. Khi chạy, cửa sổ chính thu vào khay và cửa sổ môi trường ẩn để nhường thao tác cho phần mềm đích; bảng nổi hiển thị STT / tên trường vừa lấy. Khi mở lại bảng, màu vàng là ô vừa lấy / dừng tới, xanh là các ô đã đi qua; chạy thành công chuyển các ô đã lấy sang xanh. Bắt đầu lượt mới hoặc sửa dữ liệu sẽ xóa dấu màu cũ. Màu chỉ xác nhận sao chép dữ liệu, không xác nhận kết quả nhập / đăng ký HIS.
 
 **Nhiều môi trường:** bấm **+ Tạo mới**, đặt tên rồi thêm trường / dán dữ liệu. Chọn bảng cũ bằng danh sách **Bảng**. Mỗi môi trường có dữ liệu riêng. Kịch bản đã học vẫn lấy bảng chứa các trường đã học dù bạn đang xem bảng khác; kịch bản chia sẻ từ máy khác sẽ ghép tên trường vào bảng đang chọn khi không có mã trường gốc. Khi học không chuyển bảng.
 
 **Quét chọn và xóa:** kéo chuột từ ô đầu đến ô cuối, Shift + bấm hoặc Shift + mũi tên để mở rộng vùng. Kéo ra mép bảng sẽ tự cuộn. Ctrl+A chọn toàn bộ dữ liệu; Ctrl+C sao chép vùng theo hàng / cột để dán ra Excel. Delete hoặc **Xóa vùng chọn** chỉ xóa nội dung, giữ STT và trường. **Làm trống bảng** xóa toàn bộ dữ liệu bảng đang chọn sau khi xác nhận, giữ cột để dán danh sách mới và giữ nguyên các bảng khác. Các thao tác tạo / đổi / xóa bị khóa khi học hoặc chạy.
 
-Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tính năng** ẩn tab và ngừng dùng công cụ, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong tab này.
+Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tiện ích** có xác nhận, đóng cửa sổ môi trường và bỏ nút mở trên bảng điều khiển, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong cửa sổ môi trường.
 
-**Thoát toàn bộ** là tab riêng cạnh **Tính năng mở rộng** trên thanh tab. Chọn tab này để thoát; menu cũng có cùng lệnh. Lệnh này dừng / lưu kịch bản, đóng công việc riêng và thoát hẳn. Nếu lưu thất bại sẽ báo lỗi thay vì báo đã lưu. Nút đóng [X] vẫn theo tùy chọn thu vào khay trong Cài đặt.
+**Thoát toàn bộ** là tab riêng màu đỏ, luôn nằm cuối cùng bên phải trên thanh tab. Chọn tab này để thoát; menu cũng có cùng lệnh. Lệnh này dừng / lưu kịch bản, đóng công việc riêng và thoát hẳn. Nếu lưu thất bại sẽ báo lỗi thay vì báo đã lưu. Nút đóng [X] vẫn theo tùy chọn thu vào khay trong Cài đặt.
 
 Đã kiểm thử bằng dữ liệu mẫu và thao tác HIS mô phỏng, chưa xác minh đăng ký thực tế trên phần mềm HIS. Công cụ hỗ trợ nhập liệu theo kịch bản, không kết nối trực tiếp tới cơ sở dữ liệu HIS.
 
+Cài / gỡ dùng gói tiện ích đi kèm ứng dụng. Trong lúc xử lý, các nút bị khóa và thanh tiến trình hiển thị trạng thái; chờ thông báo hoàn tất rồi mở môi trường. Gỡ có xác nhận và giữ dữ liệu để cài lại.
+
 ![Tính năng mở rộng](docs/images/extensions.png)
+
+![Tiến trình cài tiện ích](docs/images/extensions-installing.png)
 
 ![Môi trường thao tác — dữ liệu mẫu](docs/images/his-environment.png)
 
 ![Quét chọn nhiều ô](docs/images/his-selection.png)
+
+![Màu tiến độ lấy dữ liệu](docs/images/his-cell-progress.png)
+
+![Đếm ngược trước khi học](docs/images/his-countdown.png)
 
 ![Học lấy dữ liệu từ bảng mẫu](docs/images/his-learning.png)
 

@@ -19,6 +19,11 @@ class OverlayInput:
         self.bounds = self.stop_bounds = (0,0,0,0)
         self.on_stop = lambda:None
         self.allow_stop = True
+        self.close_bounds=self.drag_bounds=(0,0,0,0)
+        self.on_hide=lambda:None
+        self.on_drag_start=self.on_drag_move=lambda x,y:None
+        self.on_drag_end=lambda:None
+        self._dragging=False
         self.user = ctypes.WinDLL('user32', use_last_error=True)
         self.user.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
         self.user.GetWindowLongPtrW.restype = ctypes.c_ssize_t
@@ -40,6 +45,10 @@ class OverlayInput:
                 self._drained.set()
                 self.listener.suppress_event()
             return True
+        if message==0x202 and self._dragging:self._dragging=False;self.on_drag_end()
+        if self.active and self._dragging and message==0x200:
+            self.on_drag_move(data.pt.x,data.pt.y)
+            return True
         if message in self._swallowed:
             self._swallowed.discard(message)
             self.listener.suppress_event()
@@ -48,8 +57,10 @@ class OverlayInput:
         if not self.contains(self.bounds,x,y): return True
         if message in self._PAIRS:
             self._swallowed.add(self._PAIRS[message])
-            if message == 0x201 and self.allow_stop and self.contains(self.stop_bounds,x,y):
-                self.on_stop()
+            if message==0x201:
+                if self.contains(self.close_bounds,x,y):self.on_hide()
+                elif self.contains(self.drag_bounds,x,y):self._dragging=True;self.on_drag_start(x,y)
+                elif self.allow_stop and self.contains(self.stop_bounds,x,y):self.on_stop()
             self.listener.suppress_event()
         if message in (0x202,0x205,0x208,0x20C,0x20A,0x20E):
             self.listener.suppress_event()
@@ -89,6 +100,8 @@ class OverlayInput:
             self.user.SetWindowLongPtrW(self.hwnd,-20,self._style)
             self.user.SetWindowPos(self.hwnd,None,0,0,0,0,0x37)
         self.active = False
+        if self._dragging:self.on_drag_end()
+        self._dragging=False
 
     def close(self):
         self.deactivate()

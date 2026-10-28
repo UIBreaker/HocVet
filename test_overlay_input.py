@@ -29,6 +29,25 @@ class InputFilterTests(unittest.TestCase):
         self.route.listener.suppress_event.assert_not_called()
         self.route.on_stop.assert_not_called()
 
+    def test_physical_drag_and_close_route_without_affecting_injected_actions(self):
+        self.route.drag_bounds=(10,10,140,60);self.route.close_bounds=(150,10,195,60)
+        self.route.on_drag_start=Mock();self.route.on_drag_move=Mock();self.route.on_hide=Mock()
+        self.assertTrue(self.route._filter(0x201,self.data(x=30,y=30,flags=1)))
+        self.assertTrue(self.route._filter(0x201,self.data(x=170,y=30,flags=1)))
+        self.route.on_drag_start.assert_not_called();self.route.on_hide.assert_not_called()
+        with self.assertRaises(Suppressed):self.route._filter(0x201,self.data(x=30,y=30))
+        self.assertTrue(self.route._dragging)
+        self.assertTrue(self.route._filter(0x200,self.data(x=400,y=400)))
+        self.route.on_drag_move.assert_called_once_with(400,400)
+        self.assertTrue(self.route._filter(0x202,self.data(flags=1)))
+        self.assertTrue(self.route._dragging)
+        with self.assertRaises(Suppressed):self.route._filter(0x202,self.data(x=400,y=400))
+        self.assertFalse(self.route._dragging)
+        with self.assertRaises(Suppressed):self.route._filter(0x201,self.data(x=170,y=30))
+        self.route.on_hide.assert_called_once();self.route.on_stop.assert_not_called()
+        self.route.bounds=(0,0,0,0)
+        with self.assertRaises(Suppressed):self.route._filter(0x202,self.data(x=170,y=30))
+
     def test_physical_stop_is_swallowed_with_release_even_after_deactivation(self):
         with self.assertRaises(Suppressed):self.route._filter(0x201,self.data())
         self.route.on_stop.assert_called_once()

@@ -11,7 +11,7 @@ from ui_theme import ThemedInputs,ThemedMessages
 
 class ExtensionsPanel:
     def __init__(self,parent,app):
-        self.app=app
+        self.app=app;self.busy=False;self.timer=None
         body=ttk.Frame(parent,padding=18);body.pack(fill='both',expand=True)
         heading=ttk.Frame(body);heading.pack(fill='x')
         ttk.Label(heading,text='Tính năng mở rộng',font=('Segoe UI',17,'bold')).pack(side='left')
@@ -19,34 +19,55 @@ class ExtensionsPanel:
         card=ttk.LabelFrame(body,text='Hỗ trợ ĐK KCB HIS',padding=16);card.pack(fill='x')
         ttk.Label(card,text='Bảng dữ liệu dạng ô: học sao chép từng trường ở một hàng, mỗi vòng chạy lấy hàng kế tiếp.',
             wraplength=620).pack(anchor='w')
-        ttk.Label(card,text='Dữ liệu lưu trên máy. Gỡ công cụ sẽ ẩn tab; bảng đã nhập được giữ lại để cài lại.',
+        ttk.Label(card,text='Gói công cụ đi kèm ứng dụng, cài trên máy không cần tải mạng. Gỡ công cụ sẽ đóng cửa sổ; bảng được giữ để cài lại.',
             wraplength=620).pack(anchor='w',pady=8)
         self.status=ttk.Label(card);self.status.pack(anchor='w',pady=8)
+        self.progress=ttk.Progressbar(card,mode='indeterminate')
         actions=ttk.Frame(card);actions.pack(fill='x')
-        self.install=ttk.Button(actions,text='Cài đặt',style='Primary.TButton',command=lambda:app._set_his_installed(True))
+        self.install=ttk.Button(actions,text='Cài đặt trên máy',style='Primary.TButton',command=lambda:self.change_installation(True))
         self.install.pack(side='left')
         self.open=ttk.Button(actions,text='Mở môi trường thao tác',command=app._show_his_environment)
         self.open.pack(side='left',padx=8)
-        self.remove=ttk.Button(actions,text='Gỡ tính năng',style='Danger.TButton',command=lambda:app._set_his_installed(False))
+        self.remove=ttk.Button(actions,text='Gỡ tiện ích',style='Danger.TButton',command=lambda:self.change_installation(False))
         self.remove.pack(side='right')
         self.refresh()
 
     def refresh(self):
         model=self.app.his
-        self.status.configure(text=model.error or ('Đã cài đặt' if model.installed else 'Chưa cài đặt'))
-        idle=self.app.manager.state==self.app.manager.STATE_IDLE and not self.app.manager.external_busy and self.app._pending_play is None
+        if not self.busy:self.status.configure(text=model.error or ('ĐÃ CÀI · Sẵn sàng mở cửa sổ Môi trường thao tác' if model.installed else 'CHƯA CÀI · Cài công cụ để bắt đầu'))
+        idle=not self.busy and self.app.manager.state==self.app.manager.STATE_IDLE and not self.app.manager.external_busy and self.app._pending_play is None
         self.install.configure(state='normal' if idle and not model.installed and not model.error else 'disabled')
         self.remove.configure(state='normal' if idle and model.installed else 'disabled')
-        self.open.configure(state='normal' if model.installed else 'disabled')
+        self.open.configure(state='normal' if model.installed and not self.busy else 'disabled')
+
+    def change_installation(self,installed):
+        if self.busy or self.app._closing or self.app.manager.state!=self.app.manager.STATE_IDLE or self.app.manager.external_busy or self.app._pending_play is not None:return
+        if installed==self.app.his.installed:return
+        if not installed and not ThemedMessages.askyesno('Gỡ tiện ích','Gỡ Hỗ trợ ĐK KCB HIS và đóng cửa sổ môi trường? Bảng đã nhập được giữ để cài lại.',parent=self.app.root):return
+        self.busy=True;self.refresh()
+        self.status.configure(text='Đang cài Hỗ trợ ĐK KCB HIS lên máy…' if installed else 'Đang gỡ Hỗ trợ ĐK KCB HIS…')
+        self.progress.pack(fill='x',pady=(0,10));self.progress.start(12)
+        self.timer=self.app.root.after(450,lambda:self.finish_installation(installed))
+
+    def finish_installation(self,installed):
+        if self.timer:self.app.root.after_cancel(self.timer);self.timer=None
+        try:success=self.app._set_his_installed(installed)
+        finally:self.busy=False;self.progress.stop();self.progress.pack_forget();self.refresh()
+        if success:self.status.configure(text='CÀI ĐẶT HOÀN TẤT · Bấm Mở môi trường thao tác để bắt đầu.' if installed else 'ĐÃ GỠ TIỆN ÍCH · Có thể cài lại; dữ liệu bảng được giữ.')
+
+    def cancel_installation(self):
+        if self.timer:self.app.root.after_cancel(self.timer);self.timer=None
+        self.progress.stop();self.busy=False
 
 
 class HisPanel:
     def __init__(self,parent,app):
         self.app=app;self.model=app.his;self.parent=parent
         self.cell=None;self.editor=None;self.anchor=None;self.extent=None;self.drag_timer=None
+        self.completed={};self.current_copy=None;self.latest_copy='';self.latest_row=None;self.countdown_seconds=3
         top=ttk.Frame(parent,padding=(12,10));top.pack(fill='x')
         ttk.Label(top,text='Môi trường thao tác',font=('Segoe UI',15,'bold')).pack(side='left')
-        self.learn=ttk.Button(top,text='Học với bảng',style='Primary.TButton',command=app._cmd_start_recording)
+        self.learn=ttk.Button(top,text='Học với bảng',style='Primary.TButton',command=lambda:app._cmd_start_recording(force_countdown=True))
         self.learn.pack(side='right')
         self.stop=ttk.Button(top,text='Dừng học',style='Danger.TButton',command=app._cmd_stop_recording)
         self.stop.pack(side='right',padx=8)
@@ -62,7 +83,12 @@ class HisPanel:
         self.clear_all_button=ttk.Button(environments,text='Làm trống bảng',style='Danger.TButton',command=self.clear_all)
         self.clear_all_button.pack(side='right')
         controls=ttk.Frame(parent,padding=(12,4));controls.pack(fill='x')
-        self.add_field_button=ttk.Button(controls,text='+ Trường dữ liệu',command=self.add_field);self.add_field_button.pack(side='left')
+        self.add_field_button=ttk.Menubutton(controls,text='Trường dữ liệu ▾');self.add_field_button.pack(side='left')
+        self.field_menu=tk.Menu(self.add_field_button,tearoff=False,postcommand=self.update_field_menu)
+        self.add_field_button.configure(menu=self.field_menu)
+        for text,command in (('+ Thêm trường',self.add_field),('Đổi tên trường',self.rename_field),('Chuyển sang trái',lambda:self.move_field(-1)),
+                             ('Chuyển sang phải',lambda:self.move_field(1)),('Xóa trường dữ liệu',self.delete_field)):
+            self.field_menu.add_command(label=text,command=command)
         self.add_row_button=ttk.Button(controls,text='+ Hàng',command=self.add_row);self.add_row_button.pack(side='left',padx=6)
         self.paste_button=ttk.Button(controls,text='Dán dữ liệu · Ctrl+V',command=self.paste);self.paste_button.pack(side='left')
         self.copy_button=ttk.Button(controls,text='Sao chép',style='Info.TButton',command=self.copy_cell);self.copy_button.pack(side='right')
@@ -80,6 +106,7 @@ class HisPanel:
         self.table.configure(xscrollcommand=self.horizontal.set)
         self.table.before_scroll=self.commit_editor
         self.table.bind('<Button-1>',self.select_cell)
+        self.table.bind('<Button-3>',self.open_field_menu)
         self.table.bind('<B1-Motion>',self.drag_select)
         self.table.bind('<ButtonRelease-1>',self.end_drag)
         self.table.bind('<Destroy>',self.end_drag)
@@ -95,6 +122,8 @@ class HisPanel:
             self.table.bind(f'<{key}>',lambda event,d=delta:self.move_cell(*d))
             self.table.bind(f'<Shift-{key}>',lambda event,d=delta:self.move_cell(*d,extend=True))
         self.info=ttk.Label(parent,text='Chọn một ô dữ liệu để sao chép.');self.info.pack(fill='x',padx=14)
+        self.progress_info=ttk.Label(parent,text='Tiến độ lấy dữ liệu: vàng = ô vừa lấy · xanh = đã đi qua.',wraplength=700)
+        self.progress_info.pack(fill='x',padx=14,pady=(2,0))
         ttk.Label(parent,text='Kéo chuột / Shift để quét ô · Ctrl+A chọn tất cả · Delete xóa vùng · Ctrl+C / Ctrl+V sao chép / dán.',
                   wraplength=700).pack(fill='x',padx=14,pady=(4,10))
         self.refresh();self.sync_state()
@@ -107,18 +136,99 @@ class HisPanel:
         for button in (self.add_field_button,self.add_row_button,self.paste_button,self.new_button,self.clear_all_button,self.delete_button):button.configure(state='normal' if idle else 'disabled')
         self.environment_choice.configure(state='readonly' if idle else 'disabled')
         learning=self.app.manager.state==self.app.manager.STATE_RECORDING
+        countdown=self.app.manager.state==self.app.manager.STATE_COUNTDOWN
         self.copy_button.configure(state='normal' if idle or learning else 'disabled')
         self.learn.configure(state='normal' if idle and self.app.manager.script_activation=='mouse' else 'disabled')
-        self.stop.configure(state='normal' if learning and self.app.manager.script_activation=='mouse' else 'disabled')
+        self.stop.configure(state='normal' if (learning or countdown) and self.app.manager.script_activation=='mouse' else 'disabled')
         self.instructions.configure(text='ĐANG HỌC: nhấp đúp hoặc Sao chép ô → quay về HIS dán. Bấm Môi trường ở bảng nổi để lấy trường tiếp theo.' if learning else
             'Chọn ô rồi Ctrl+V để dán danh sách: mỗi dòng vào một STT. Nhấp đúp để sửa. Dán từ Excel không gồm STT / tiêu đề.')
+        if countdown:self.instructions.configure(text=f'SẴN SÀNG HỌC SAU {self.countdown_seconds} GIÂY · Bấm Dừng học để hủy, chưa ghi thao tác.')
 
     def refresh(self):
         self.environment_choice.configure(values=[env['name'] for env in self.model.environments])
         self.environment_choice.current(next(i for i,env in enumerate(self.model.environments) if env['id']==self.model.active_id))
         self.visible_fields=self.model.fields
         self.table.selection=self.selection_bounds()
+        self.table.processed=self.completed.get(self.model.active_id,set())
+        self.table.current_copy=self.current_copy[1:] if self.current_copy and self.current_copy[0]==self.model.active_id else None
         self.table.set_data(self.visible_fields,self.model.rows,self.table.start,self.cell)
+
+    def reset_progress(self):
+        self.completed.clear();self.current_copy=None;self.latest_copy='';self.latest_row=None
+        self.progress_info.configure(text='Tiến độ lấy dữ liệu: vàng = ô vừa lấy · xanh = đã đi qua.')
+        self.refresh()
+
+    def mark_copied(self,environment_id,field_id,row):
+        env=next((item for item in self.model.environments if item['id']==environment_id),None)
+        field=next((item for item in env['fields'] if item['id']==field_id),None) if env else None
+        if not field:return
+        if self.current_copy:self.completed.setdefault(self.current_copy[0],set()).add(self.current_copy[1:])
+        self.current_copy=(environment_id,row-1,field_id)
+        self.latest_copy=f'{env["name"]} · STT {row} · {field["name"]}';self.latest_row=row
+        self.progress_info.configure(text=f'Đang tới: {self.latest_copy} · Màu chỉ xác nhận lấy dữ liệu, chưa xác nhận nhập HIS.')
+        if self.parent.winfo_ismapped():
+            self.refresh()
+            if self.model.active_id==environment_id:self.table.see(row-1,field_id)
+
+    def finish_progress(self,success):
+        if not self.current_copy:return
+        if success:self.completed.setdefault(self.current_copy[0],set()).add(self.current_copy[1:]);self.current_copy=None
+        self.progress_info.configure(text=f'{"Đã lấy xong" if success else "Đã dừng tại"}: {self.latest_copy}. Màu không xác nhận kết quả nhập HIS.')
+        self.refresh()
+
+    def show_countdown(self,seconds):
+        self.countdown_seconds=seconds
+        self.sync_state()
+
+    def selected_field(self):
+        return next((field for field in self.model.fields if self.cell and field['id']==self.cell[1]),None)
+
+    def update_field_menu(self):
+        field=self.selected_field();idle=self.idle()
+        index=next((i for i,item in enumerate(self.model.fields) if field and item['id']==field['id']),-1)
+        for item in range(5):
+            enabled=idle and (item==0 or field is not None)
+            if item==2:enabled=enabled and index>0
+            if item==3:enabled=enabled and index<len(self.model.fields)-1
+            self.field_menu.entryconfigure(item,state='normal' if enabled else 'disabled')
+
+    def open_field_menu(self,event):
+        if not self.idle():return 'break'
+        column=self.table.identify_column(event.x)
+        if column and 1<=int(column[1:])-1<=len(self.model.fields):
+            self.cell=self.anchor=self.extent=(self.table.start,self.model.fields[int(column[1:])-2]['id'])
+            self.show_selection()
+        try:self.field_menu.tk_popup(event.x_root,event.y_root)
+        finally:self.field_menu.grab_release()
+        return 'break'
+
+    def rename_field(self):
+        field=self.selected_field()
+        if not self.idle() or not field:return
+        self.commit_editor()
+        name=ThemedInputs.askstring('Đổi tên trường','Tên trường mới:',initialvalue=field['name'],parent=self.parent)
+        if not name or not self.idle():return
+        try:self.model.rename_field(field['id'],name);self.refresh()
+        except (ValueError,OSError) as error:self.app.notify_app('Chưa đổi tên được',str(error))
+
+    def move_field(self,direction):
+        field=self.selected_field()
+        if not self.idle() or not field:return
+        self.commit_editor()
+        try:
+            self.model.move_field(field['id'],direction);self.anchor=self.extent=self.cell
+            self.refresh();self.table.see(*self.cell)
+        except (ValueError,OSError) as error:self.app.notify_app('Chưa chuyển được trường',str(error))
+
+    def delete_field(self):
+        field=self.selected_field()
+        if not self.idle() or not field:return
+        self.commit_editor()
+        if not ThemedMessages.askyesno('Xóa trường dữ liệu',f'Xóa cột “{field["name"]}” và toàn bộ dữ liệu trong cột? Kịch bản dùng trường này cần học lại bước lấy dữ liệu. Các cột khác được giữ.',parent=self.parent):return
+        if not self.idle():return
+        try:
+            self.model.delete_field(field['id']);self.reset_selection();self.reset_progress()
+        except (ValueError,OSError) as error:self.app.notify_app('Chưa xóa được trường',str(error))
 
     def reset_selection(self):
         self.end_drag()
@@ -147,7 +257,7 @@ class HisPanel:
         if not ThemedMessages.askyesno('Làm trống bảng',f'Xóa toàn bộ dữ liệu trong “{name}”? Giữ tên trường, STT và các bảng khác.',parent=self.parent):return
         if not self.idle():return
         try:
-            self.model.update(rows=[{}]);self.reset_selection()
+            self.model.update(rows=[{}]);self.reset_selection();self.reset_progress()
             self.info.configure(text=f'Đã làm trống “{name}”. Có thể dán dữ liệu mới.')
         except (ValueError,OSError) as error:self.app.notify_app('Chưa xóa được dữ liệu',str(error))
 
@@ -177,7 +287,7 @@ class HisPanel:
         if not bounds:return 'break'
         r1,c1,r2,c2=bounds
         try:
-            self.model.clear_cells(r1,r2,c1,c2);self.refresh()
+            self.model.clear_cells(r1,r2,c1,c2);self.reset_progress()
             self.info.configure(text=f'Đã xóa dữ liệu vùng STT {r1+1}–{r2+1}. Giữ nguyên hàng và trường.')
         except (ValueError,OSError) as error:self.app.notify_app('Chưa xóa được vùng chọn',str(error))
         return 'break'
@@ -220,6 +330,10 @@ class HisPanel:
             self.cell=self.anchor=self.extent=None;self.table.selection=None;self.table.selected=None;self.table.draw()
         if event.y<self.table.header_height and column==f'#{len(self.visible_fields)+2}':
             self.add_field();return
+        if event.y<self.table.header_height and column and 0<=int(column[1:])-2<len(self.model.fields):
+            field=self.model.fields[int(column[1:])-2]
+            self.cell=self.anchor=(0,field['id']);self.extent=(max(0,len(self.model.rows)-1),field['id'])
+            self.table.focus_set();self.show_selection();return
         if not row or not column:return
         self.table.focus_set()
         index=int(column[1:])-2
@@ -293,7 +407,7 @@ class HisPanel:
         entry,row,field=self.editor;self.editor=None
         value=entry.get();entry.destroy()
         try:
-            if not cancel and self.idle():self.model.set_cell(row,field,value)
+            if not cancel and self.idle():self.model.set_cell(row,field,value);self.reset_progress()
         except (ValueError,OSError) as error:self.app.notify_app('Chưa lưu được ô',str(error))
         finally:
             self.app.manager.shortcuts_suspended=False
@@ -331,6 +445,7 @@ class HisPanel:
         if state==self.app.manager.STATE_RECORDING:
             self.app.manager.recorder.record_field(field_id,field['name'],row+1)
             self.app.root.withdraw()
+            self.app.his_window.withdraw()
             self.app.workspace.set_visible(False)
         self.app.notify_app('Đã sao chép ô',f'STT {row+1} · {field["name"]}. Quay về HIS và dán.')
         return 'break'
@@ -353,6 +468,7 @@ class HisPanel:
                 if first[0]=='stt' or first==names:
                     raise ValueError('Vùng dán đang gồm STT / tiêu đề. Chỉ chọn các ô dữ liệu trong Excel rồi dán lại.')
             self.model.paste(row,column,values)
+            self.reset_progress()
             self.refresh()
             self.cell=(row,self.model.fields[column]['id'])
             self.anchor=self.cell;self.extent=(row+len(values)-1,self.model.fields[column+max(map(len,values))-1]['id'])

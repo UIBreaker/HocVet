@@ -1,3 +1,44 @@
+# Học Vẹt v0.20.0
+
+- Trải nghiệm cài / gỡ tiện ích có trạng thái đang xử lý, thanh tiến trình, khóa nút trong lúc thực hiện và thông báo hoàn tất. Gói công cụ đi kèm ứng dụng, không tạo thông báo tải mạng. Gỡ có xác nhận và giữ dữ liệu bảng để cài lại.
+- Chuyển Môi trường thao tác thành cửa sổ riêng, mở lại cùng cửa sổ khi đã có; đóng [X] chỉ ẩn, không tạo thêm tab trên cửa sổ chính. Học / dán / tiến độ / bảng dữ liệu được giữ nguyên. Khi lấy ô lúc học, cửa sổ bảng ẩn để trả tiêu điểm về phần mềm đích.
+- Bảng điều khiển có nút Mở môi trường HIS sau khi cài; gỡ bỏ nút đó và đóng cửa sổ. Khi đang phát, khóa mở môi trường để bảo vệ tiêu điểm.
+- Thêm × ẩn bảng điều khiển, nút Bảng điều khiển trên màn hình chính và menu khay mở / ẩn. Bảng ẩn vẫn để công việc tiếp tục, không tự mở lại bởi thông báo tiến độ. Có thể dừng qua khay hoặc mở lại bảng; bắt đầu học mới hiện đếm ngược.
+- Kéo tiêu đề bảng để di chuyển cả lúc đang chạy, cập nhật vùng Dừng / ẩn / kéo theo vị trí mới. Hỗ trợ vùng làm việc màn hình tại vị trí kéo. Chuột do kịch bản phát vẫn xuyên bảng, không kích hoạt kéo / ẩn / dừng.
+- Kiểm thử cài / gỡ / cài lại, giữ dữ liệu, cửa sổ riêng không thêm tab, ẩn / mở / di chuyển, bộ lọc chuột thật / chuột phát; kiểm tra tương tác thực trên cửa sổ mẫu và trình duyệt cục bộ. Chưa kiểm thử đăng ký trên HIS thực tế.
+
+- Từ v0.18.0: thêm quản lý cột, đếm ngược học với bảng, màu tiến độ từng ô và tab Thoát toàn bộ luôn ở ngoài cùng bên phải.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản cũ rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Tiện ích HIS dùng gói có sẵn trong ứng dụng; gỡ tiện ích vẫn giữ các môi trường dữ liệu.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.20.0-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Khi ẩn bảng, công việc vẫn chạy; có thể mở lại bảng hoặc dừng qua menu khay. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**. Màu ô chỉ báo việc lấy dữ liệu, không xác nhận kết quả trên HIS; chưa xác minh đăng ký HIS thực tế.
+
+---
+
+# Học Vẹt v0.19.1
+
+- Đưa Thoát toàn bộ về cuối thanh tab; tab tiện ích thêm vào phía trước nên vị trí thoát luôn ở ngoài cùng bên phải.
+- Hiển thị nhãn nền đỏ, chữ trắng, giữ thao tác dừng / lưu và thoát hẳn.
+- Kiểm tra thứ tự sau cài / gỡ / cài lại tiện ích và chức năng thoát.
+
+---
+
+# Học Vẹt v0.19.0
+
+- Menu Trường dữ liệu cho phép thêm, đổi tên, đổi vị trí trái / phải và xóa cột. Chọn tiêu đề / ô hoặc nhấp chuột phải để thao tác. Xóa có xác nhận và chỉ ảnh hưởng cột trong bảng hiện tại; đổi tên / vị trí giữ mã trường.
+- Giữ tham chiếu trường đã xóa để chặn kịch bản cũ trước khi chạy, kể cả khi đang xem bảng khác có cột cùng tên. Lỗi lưu giữ nguyên trường / dữ liệu.
+- Học với bảng luôn đếm ngược 3–2–1 ở cả hướng dẫn trong bảng và thông báo ứng dụng. Dừng học hủy đếm ngược mà không ghi đè kịch bản.
+- Sau khi sao chép clipboard thành công, cập nhật ô vàng hiện tại và ô xanh đã đi qua theo đúng bảng / trường / STT mỗi vòng. Bảng nổi hiển thị trường vừa lấy; mở lại bảng xem dấu màu. Dừng lỗi giữ ô cuối màu vàng; hoàn tất chuyển các ô đã lấy sang xanh. Không đổi dữ liệu theo màu; sửa dữ liệu / lượt mới xóa dấu tiến độ cũ.
+- Kiểm thử xóa / hủy / lỗi lưu, đổi tên / vị trí, chặn tham chiếu cột đã xóa, đếm ngược / hủy, chỉ báo sau sao chép thành công và giữ nguyên dữ liệu. Chưa kiểm thử đăng ký HIS thực tế; màu không xác nhận kết quả nhập trên HIS.
+
+---
+
 # Học Vẹt v0.18.0
 
 - Thêm nhiều môi trường: + Tạo mới tạo bảng có tên riêng, danh sách Bảng chuyển giữa các môi trường; bảng cũ và trạng thái chọn lưu qua lần mở ứng dụng.
