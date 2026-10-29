@@ -1,3 +1,21 @@
+# Học Vẹt v0.21.1
+
+- Sửa kiểu dán ngày mặc định: nhận diện ô bàn phím bằng Windows UI Automation, chỉ gửi Tab khi HIS chưa tự chuyển sang ô tiếp theo. Tránh ngày vào ô ngày, tháng vào ô năm và năm vào ô phụ khi HIS đã tự chuyển ô.
+- Dừng và báo lỗi nếu không xác định / so sánh được ô, thay vì tiếp tục chuyển ô theo phỏng đoán. Không đọc nội dung các ô qua UI Automation và không thêm thư viện bên ngoài.
+- Kiểm thử cùng chế độ mặc định trên giả lập thường và giả lập tự chuyển, qua học / lưu / nạp lại / chạy 5 hàng ở 1×, 10×. Chưa thao tác trực tiếp trên HIS thật.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản đang chạy rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này. Kiểu ngày mặc định đã lưu tự nhận biết việc chuyển ô; kịch bản đã có bước dán ngày không cần học lại chỉ để nhận bản sửa.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.21.1-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Kiểu **HIS tự chuyển ô** vẫn giữ nguyên hành vi không gửi Tab. Kịch bản cũ chỉ sao chép một ô cần học lại bước dán ngày. Đã kiểm tra trên HIS giả lập; chưa xác minh trên HIS thực tế. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**.
+
+---
+
 # Học Vẹt v0.21.0
 
 - Hỗ trợ trường ngày tự chuyển ô của HIS: chọn **Ngày → 3 ô (HIS tự chuyển ô)** để không gửi thêm Tab sau ngày và tháng. Giữ chế độ Tab cho HIS không tự chuyển. Cả lúc học và phát lại đều dùng kiểu dán đã lưu của cột.

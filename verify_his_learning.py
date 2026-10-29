@@ -68,9 +68,9 @@ def main():
                     }
                 }''')
             app.his_panel.show_selection()
-            app.his_panel.paste_mode_choice.current(2 if args.auto_advance else 1)
+            app.his_panel.paste_mode_choice.current(1)
             app.his_panel.paste_mode_choice.event_generate('<<ComboboxSelected>>')
-            assert app.his.fields[0].get('paste_mode')==('date_dmy_auto' if args.auto_advance else 'date_dmy')
+            assert app.his.fields[0].get('paste_mode')=='date_dmy'
             app._cmd_start_recording(force_countdown=True)
             pump(3.5)
             assert app.manager.state==app.manager.STATE_RECORDING

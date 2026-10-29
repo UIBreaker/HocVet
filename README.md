@@ -1,21 +1,21 @@
-# Học Vẹt · v0.21.0
+# Học Vẹt · v0.21.1
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.21.0
+## Có gì mới trong 0.21.1
 
-- Thêm **Ngày → 3 ô (HIS tự chuyển ô)**, tránh gửi Tab thừa làm bỏ qua ô tháng; vẫn có chế độ chuyển bằng Tab.
-- Chỉ mở **một phiên Học Vẹt** trong mỗi phiên đăng nhập Windows, kể cả từ thư mục khác; mở thêm sẽ gọi lại cửa sổ hiện có.
+- Kiểu dán ngày mặc định **tự nhận biết HIS đã chuyển ô**, chỉ gửi Tab khi còn ở ô cũ, tránh bỏ qua ô tháng.
+- Dừng và báo lỗi khi không xác định được ô nhập; kịch bản đã có bước dán ngày tiếp tục dùng được.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.21.0-Windows.zip** tại [bản phát hành 0.21.0](https://github.com/UIBreaker/HocVet/releases/tag/v0.21.0); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.21.1-Windows.zip** tại [bản phát hành 0.21.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.21.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
-Đóng hết các phiên bản cũ trước lần mở 0.21.0 đầu tiên để cơ chế một phiên có hiệu lực. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
+Đóng phiên bản đang chạy trước khi mở EXE mới. Nếu nâng cấp từ bản trước 0.21.0, đóng hết các phiên cũ một lần để cơ chế một phiên có hiệu lực. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
 Học Vẹt chỉ chạy một phiên trong mỗi phiên đăng nhập Windows. Mở thêm EXE từ thư mục khác sẽ gọi lại cửa sổ đang có; khi đang học / chạy, ứng dụng giữ tiêu điểm cho công việc. Sau khi thoát hoặc tiến trình bị ngắt, có thể mở lại bình thường.
 
@@ -137,7 +137,7 @@ Chọn ô cần bắt đầu rồi **Ctrl+V** hoặc **Dán dữ liệu**. Ví d
 
 **Quét chọn và xóa:** kéo chuột từ ô đầu đến ô cuối, Shift + bấm hoặc Shift + mũi tên để mở rộng vùng. Kéo ra mép bảng sẽ tự cuộn. Ctrl+A chọn toàn bộ dữ liệu; Ctrl+C sao chép vùng theo hàng / cột để dán ra Excel. Delete hoặc **Xóa vùng chọn** chỉ xóa nội dung, giữ STT và trường. **Làm trống dữ liệu** xóa dữ liệu bảng đang chọn sau khi xác nhận, giữ cột và các bảng khác. **Xóa bảng** xóa cả bảng, các cột và dữ liệu sau xác nhận; kịch bản dùng bảng đã xóa sẽ báo cần học lại. Xóa bảng cuối sẽ tạo một bảng trống. Các thao tác tạo / đổi / xóa bị khóa khi học hoặc chạy.
 
-**Ngày tháng tách ô HIS:** chọn một ô của cột ngày rồi đặt **Kiểu dán** ở hàng tùy chọn của cột. Chọn **Ngày → 3 ô (chuyển bằng Tab)** nếu phải bấm Tab để qua tháng / năm; chọn **Ngày → 3 ô (HIS tự chuyển ô)** nếu nhập đủ hai chữ số là HIS tự chuyển sang ô tiếp theo. Kiểu tự chuyển không gửi thêm Tab, tránh bỏ qua ô tháng. Nhập ngày đầy đủ như `19/08/1989`, sao chép ô, chọn **ô ngày đầu tiên** trên HIS rồi **Ctrl+V và nhả Ctrl**. Khi học, bước **Dán ngày → 3 ô HIS** được ghi khi bạn dán; mỗi vòng chạy lấy hàng kế tiếp và dùng kiểu chuyển ô đã lưu của cột. Kịch bản đã có bước dán ngày không cần học lại khi đổi giữa hai kiểu chuyển ô; kịch bản cũ chỉ sao chép một ô cần học lại. Chế độ chờ dán có hiệu lực 60 giây và hủy nếu nội dung clipboard đổi. Với ngày nằm trong một textbox duy nhất, giữ **Văn bản → 1 ô**. Đã kiểm tra cả hai kiểu trên trang giả lập; chưa kiểm tra trực tiếp trên HIS thật.
+**Ngày tháng tách ô HIS:** chọn một ô của cột ngày rồi đặt **Kiểu dán** ở hàng tùy chọn của cột. Chọn **Ngày → 3 ô (tự nhận biết chuyển ô)** để ứng dụng so sánh ô đang nhận bàn phím trước / sau khi dán ngày và tháng: nếu HIS đã chuyển ô thì không gửi Tab, nếu còn ở ô cũ mới gửi Tab. Khi không xác định / so sánh được ô qua Windows UI Automation, ứng dụng dừng và báo lỗi. Tùy chọn **Ngày → 3 ô (HIS tự chuyển ô)** vẫn có sẵn khi muốn để HIS chuyển ô hoàn toàn; tùy chọn này không gửi Tab. Nhập ngày đầy đủ như `19/08/1989`, sao chép ô, chọn **ô ngày đầu tiên** trên HIS rồi **Ctrl+V và nhả Ctrl**. Khi học, bước **Dán ngày → 3 ô HIS** được ghi khi bạn dán; mỗi vòng chạy lấy hàng kế tiếp và dùng kiểu chuyển ô đã lưu của cột. Kịch bản đã có bước dán ngày không cần học lại khi đổi giữa hai kiểu chuyển ô; kịch bản cũ chỉ sao chép một ô cần học lại. Chế độ chờ dán có hiệu lực 60 giây và hủy nếu nội dung clipboard đổi. Với ngày nằm trong một textbox duy nhất, giữ **Văn bản → 1 ô**. Kiểu mặc định đã được kiểm tra với cả trang thường và trang tự chuyển ô; chưa kiểm tra trực tiếp trên HIS thật.
 
 Dữ liệu và trạng thái cài đặt ở `%LOCALAPPDATA%\HocVet\his_environment.json`, có bản `.bak` khi lưu. **Gỡ tiện ích** có xác nhận, đóng cửa sổ môi trường và bỏ nút mở trên bảng điều khiển, giữ dữ liệu để cài lại. Thay EXE không xóa bảng. Các bước lấy dữ liệu trong file `.hocvet` chỉ lưu tham chiếu tên / mã trường và STT bắt đầu, không tự nhúng các hàng trong bảng; máy nhận cần cài tiện ích, tạo trường cùng tên và nhập bảng riêng. Các bước phím hoặc ảnh khác vẫn có thể chứa nội dung đã học, hãy kiểm tra trước khi chia sẻ. Kịch bản cũ sao chép theo tọa độ cần học lại các bước lấy dữ liệu trong cửa sổ môi trường.
 
@@ -209,7 +209,7 @@ python verify_his_learning.py --fixture "C:\duong-dan\HIS-mau.html"
 python verify_his_learning.py --fixture "C:\duong-dan\HIS-mau.html" --auto-advance
 ```
 
-Trang mẫu cần các ô `birth_day`, `birth_month`, `birth_year`, `birth_extra`, `full_name` và thứ tự Tab ngày → tháng → năm. Bài thứ hai mô phỏng HIS tự chuyển ô. Báo cáo từng hàng và ảnh kiểm tra nằm trong `build/his-learning/` (chuyển bằng Tab) và `build/his-learning-auto/` (tự chuyển ô). Bài này dùng Chrome và chuột / bàn phím thật; chạy riêng sau các bài giao diện khác.
+Trang mẫu cần các ô `birth_day`, `birth_month`, `birth_year`, `birth_extra`, `full_name` và thứ tự Tab ngày → tháng → năm. Cả hai bài đều chọn kiểu mặc định tự nhận biết chuyển ô; bài thứ hai mô phỏng HIS tự chuyển ô. Báo cáo từng hàng và ảnh kiểm tra nằm trong `build/his-learning/` (trang thường) và `build/his-learning-auto/` (tự chuyển ô). Bài này dùng Chrome và chuột / bàn phím thật; chạy riêng sau các bài giao diện khác.
 
 Đóng gói (cần PyInstaller):
 

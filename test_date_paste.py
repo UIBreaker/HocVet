@@ -22,11 +22,32 @@ class DateTests(unittest.TestCase):
 
     def test_paste_replaces_three_fields_and_leaves_fourth_untouched(self):
         ctrl=Mock();cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=False
-        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text') as clipboard:
+        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text') as clipboard,patch('date_paste.FocusedInput'):
             paste_date('19/08/1987',ctrl,cancel)
         self.assertEqual([call.args[0] for call in clipboard.call_args_list],['19','08','1987','19/08/1987'])
         self.assertEqual(sum(call.args==(keyboard.Key.tab,) for call in ctrl.press.call_args_list),2)
         self.assertEqual([getattr(call.args[0],'vk',None) for call in ctrl.press.call_args_list if call.args[0] not in (keyboard.Key.ctrl_l,keyboard.Key.tab)],[65,86]*3)
+
+    def test_default_mode_detects_his_auto_advance_without_extra_tabs(self):
+        controller=Mock();cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=False
+        tracker=Mock();tracker.same.side_effect=[True,False,False]
+        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text'),patch('date_paste.FocusedInput',return_value=tracker):
+            paste_date('19/08/1989',controller,cancel)
+        self.assertNotIn(unittest.mock.call(keyboard.Key.tab),controller.press.call_args_list)
+        tracker.close.assert_called_once()
+
+    def test_default_mode_detects_each_field_independently(self):
+        controller=Mock();cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=False
+        tracker=Mock();tracker.same.side_effect=[True,False,True,True,True,True,True]
+        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text'),patch('date_paste.FocusedInput',return_value=tracker):
+            paste_date('19/08/1989',controller,cancel)
+        self.assertEqual(controller.press.call_args_list.count(unittest.mock.call(keyboard.Key.tab)),1)
+
+    def test_focus_detection_failure_stops_before_pasting_parts(self):
+        controller=Mock();cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=False
+        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text') as clipboard,patch('date_paste.FocusedInput',side_effect=RuntimeError('no focus')),self.assertRaisesRegex(RuntimeError,'no focus'):
+            paste_date('19/08/1989',controller,cancel)
+        controller.press.assert_not_called();clipboard.assert_called_once_with('19/08/1989')
 
     def test_cancel_or_focus_change_blocks_input(self):
         ctrl=Mock();cancel=threading.Event();cancel.set()

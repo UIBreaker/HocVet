@@ -19,7 +19,7 @@ def verify_bundled_sources(root):
             return isinstance(right,types.CodeType) and left.co_code==right.co_code and left.co_names==right.co_names and len(left.co_consts)==len(right.co_consts) and all(same(a,b) for a,b in zip(left.co_consts,right.co_consts))
         return left==right
     for name in ('ui','core','app_info','ui_theme','retro_controls','record_notice','overlay_input',
-                 'workspace','workspace_ui','his_environment','extensions_ui','sheet_grid','clipboard_text','date_paste','single_instance'):
+                 'workspace','workspace_ui','his_environment','extensions_ui','sheet_grid','clipboard_text','date_paste','focused_input','single_instance'):
         bundled=archive.extract(name)
         source=compile((root/(name+'.py')).read_bytes(),bundled.co_filename,'exec')
         if not same(bundled,source):raise ValueError(f'File đóng gói còn mã cũ: {name}. Hãy tạo lại thư mục build của phiên bản này.')

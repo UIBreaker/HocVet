@@ -88,7 +88,7 @@ class HisPanel:
         mode_row=ttk.Frame(parent,padding=(12,2));mode_row.pack(fill='x')
         self.paste_mode_label=ttk.Label(mode_row,text='Chọn cột để xem kiểu dán:',wraplength=300)
         self.paste_mode_label.pack(side='left',padx=(0,8))
-        self.paste_mode_choice=ttk.Combobox(mode_row,state='disabled',width=40,values=['Văn bản → 1 ô','Ngày → 3 ô (chuyển bằng Tab)','Ngày → 3 ô (HIS tự chuyển ô)'])
+        self.paste_mode_choice=ttk.Combobox(mode_row,state='disabled',width=40,values=['Văn bản → 1 ô','Ngày → 3 ô (tự nhận biết chuyển ô)','Ngày → 3 ô (HIS tự chuyển ô)'])
         self.paste_mode_choice.pack(side='left')
         self.paste_mode_choice.bind('<<ComboboxSelected>>',lambda event:self.set_paste_mode(('text','date_dmy','date_dmy_auto')[self.paste_mode_choice.current()]))
         controls=ttk.Frame(parent,padding=(12,4));controls.pack(fill='x')
@@ -223,7 +223,7 @@ class HisPanel:
         self.commit_editor();self.app.date_paste.clear()
         try:
             self.model.set_paste_mode(field['id'],mode);self.refresh()
-            self.info.configure(text=f'{field["name"]}: '+('chọn ô ngày đầu tiên trên HIS rồi Ctrl+V, nhả Ctrl để điền ngày / tháng / năm. '+('HIS tự chuyển ô; không gửi thêm Tab.' if mode=='date_dmy_auto' else 'Dùng Tab để chuyển ô.') if mode in ('date_dmy','date_dmy_auto') else 'dán văn bản vào một ô.'))
+            self.info.configure(text=f'{field["name"]}: '+('chọn ô ngày đầu tiên trên HIS rồi Ctrl+V, nhả Ctrl để điền ngày / tháng / năm. '+('HIS tự chuyển ô; không gửi thêm Tab.' if mode=='date_dmy_auto' else 'Chỉ gửi Tab nếu HIS chưa tự chuyển ô.') if mode in ('date_dmy','date_dmy_auto') else 'dán văn bản vào một ô.'))
         except (ValueError,OSError) as error:self.app.notify_app('Chưa đổi được kiểu dán',str(error))
 
     def open_field_menu(self,event):

@@ -7,6 +7,7 @@ import time
 
 from pynput import keyboard
 from clipboard_text import set_clipboard_text,get_clipboard_text
+from focused_input import FocusedInput
 
 
 def date_parts(value):
@@ -33,19 +34,37 @@ def paste_date(value,controller,cancel,protect=None,target=None,navigation='tab'
             key=keyboard.KeyCode.from_vk(ord(char.upper()))
             controller.press(key);controller.release(key)
         finally:controller.release(keyboard.Key.ctrl_l)
+    focus=None
     try:
         # Ở 10×, cú bấm ô ngày có thể còn trong hàng đợi của cửa sổ đích.
         check()
         cancel.wait(.12)
         check()
+        if navigation=='tab':
+            focus=FocusedInput()
+            # Trình duyệt có thể vừa khởi tạo cây trợ năng khi được truy vấn lần đầu.
+            first=focus.current()
+            for _ in range(4):
+                if cancel.wait(.06):check()
+                second=focus.current()
+                if focus.same(first,second):break
+                first=second
         for index,part in enumerate(parts):
+            before=focus.current() if focus and index<2 else None
             check();set_clipboard_text(part,cancel);chord('a');chord('v')
             if cancel.wait(.12):check()
             check()
             if index<2 and navigation=='tab':
-                controller.press(keyboard.Key.tab);controller.release(keyboard.Key.tab)
-                if cancel.wait(.08):check()
+                moved=not focus.same(before,focus.current())
+                for _ in range(4):
+                    if moved:break
+                    if cancel.wait(.05):check()
+                    check();moved=not focus.same(before,focus.current())
+                if not moved:
+                    controller.press(keyboard.Key.tab);controller.release(keyboard.Key.tab)
+                    if cancel.wait(.08):check()
     finally:
+        if focus:focus.close()
         # Giữ nguyên ngày đầy đủ để có thể sao chép sang nơi khác sau thao tác.
         set_clipboard_text(value)
 
