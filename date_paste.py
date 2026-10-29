@@ -18,7 +18,8 @@ def date_parts(value):
     return f'{day:02}',f'{month:02}',f'{year:04}'
 
 
-def paste_date(value,controller,cancel,protect=None,target=None):
+def paste_date(value,controller,cancel,protect=None,target=None,navigation='tab'):
+    if navigation not in ('tab','auto'):raise ValueError('Kiểu chuyển ô ngày không hợp lệ.')
     parts=date_parts(value)
     user=ctypes.windll.user32
     if target is None:target=user.GetForegroundWindow()
@@ -41,7 +42,7 @@ def paste_date(value,controller,cancel,protect=None,target=None):
             check();set_clipboard_text(part,cancel);chord('a');chord('v')
             if cancel.wait(.12):check()
             check()
-            if index<2:
+            if index<2 and navigation=='tab':
                 controller.press(keyboard.Key.tab);controller.release(keyboard.Key.tab)
                 if cancel.wait(.08):check()
     finally:
@@ -57,14 +58,16 @@ class DatePaste:
         self.record_skip_release=False
         self.cancel=threading.Event()
 
-    def arm(self,value,on_paste):
+    def arm(self,value,on_paste,navigation='tab'):
         date_parts(value)
+        if navigation not in ('tab','auto'):raise ValueError('Kiểu chuyển ô ngày không hợp lệ.')
         if self.busy:raise ValueError('Đang dán ngày, hãy chờ thao tác hoàn tất.')
         if not self.listener or not self.listener.is_alive():
             self.listener=keyboard.Listener(win32_event_filter=self._filter)
             self.listener.start();self.listener.wait()
         self.cancel.clear();self.pending=(value,on_paste,time.monotonic()+60)
         self.clipboard_sequence=ctypes.windll.user32.GetClipboardSequenceNumber()
+        self.navigation=navigation
 
     def clear(self):
         self.pending=None
@@ -108,11 +111,11 @@ class DatePaste:
             self.record_skip_release=True
             target=ctypes.windll.user32.GetForegroundWindow()
             on_paste()
-            threading.Thread(target=self._paste,args=(value,target),daemon=True).start()
+            threading.Thread(target=self._paste,args=(value,target,self.navigation),daemon=True).start()
             self.listener.suppress_event()
         return True
 
-    def _paste(self,value,target=None):
+    def _paste(self,value,target=None,navigation='tab'):
         try:
             # Chờ nhả Ctrl thật để Tab không trở thành Ctrl+Tab trong trình duyệt.
             deadline=time.monotonic()+5
@@ -120,7 +123,7 @@ class DatePaste:
                 if self.cancel.wait(.01):return
                 if time.monotonic()>deadline:raise RuntimeError('Hãy nhả Ctrl sau khi bấm Ctrl+V rồi sao chép lại ngày.')
             self.swallow_v=False
-            paste_date(value,keyboard.Controller(),self.cancel,self.protect,target)
+            paste_date(value,keyboard.Controller(),self.cancel,self.protect,target,navigation)
         except Exception as error:self.on_error(str(error))
         finally:self.swallow_v=False;self.busy=False
 

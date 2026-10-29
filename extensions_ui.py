@@ -88,9 +88,9 @@ class HisPanel:
         mode_row=ttk.Frame(parent,padding=(12,2));mode_row.pack(fill='x')
         self.paste_mode_label=ttk.Label(mode_row,text='Chọn cột để xem kiểu dán:',wraplength=300)
         self.paste_mode_label.pack(side='left',padx=(0,8))
-        self.paste_mode_choice=ttk.Combobox(mode_row,state='disabled',width=32,values=['Văn bản → 1 ô','Ngày / tháng / năm → 3 ô HIS'])
+        self.paste_mode_choice=ttk.Combobox(mode_row,state='disabled',width=40,values=['Văn bản → 1 ô','Ngày → 3 ô (chuyển bằng Tab)','Ngày → 3 ô (HIS tự chuyển ô)'])
         self.paste_mode_choice.pack(side='left')
-        self.paste_mode_choice.bind('<<ComboboxSelected>>',lambda event:self.set_paste_mode('date_dmy' if self.paste_mode_choice.current()==1 else 'text'))
+        self.paste_mode_choice.bind('<<ComboboxSelected>>',lambda event:self.set_paste_mode(('text','date_dmy','date_dmy_auto')[self.paste_mode_choice.current()]))
         controls=ttk.Frame(parent,padding=(12,4));controls.pack(fill='x')
         self.add_field_button=ttk.Menubutton(controls,text='Trường dữ liệu ▾');self.add_field_button.pack(side='left')
         self.field_menu=tk.Menu(self.add_field_button,tearoff=False,postcommand=self.update_field_menu)
@@ -101,6 +101,7 @@ class HisPanel:
         self.field_menu.add_separator()
         self.field_menu.add_command(label='Kiểu dán: văn bản một ô',command=lambda:self.set_paste_mode('text'))
         self.field_menu.add_command(label='Kiểu dán: ngày → 3 ô HIS (dd/mm/yyyy)',command=lambda:self.set_paste_mode('date_dmy'))
+        self.field_menu.add_command(label='Kiểu dán: ngày → 3 ô (HIS tự chuyển ô)',command=lambda:self.set_paste_mode('date_dmy_auto'))
         self.add_row_button=ttk.Button(controls,text='+ Hàng',command=self.add_row);self.add_row_button.pack(side='left',padx=6)
         self.paste_button=ttk.Button(controls,text='Dán dữ liệu · Ctrl+V',command=self.paste);self.paste_button.pack(side='left')
         self.copy_button=ttk.Button(controls,text='Sao chép',style='Info.TButton',command=self.copy_cell);self.copy_button.pack(side='right')
@@ -161,7 +162,7 @@ class HisPanel:
         field=self.selected_field()
         self.paste_mode_choice.configure(state='readonly' if field and self.idle() else 'disabled')
         self.paste_mode_label.configure(text=f'Cột {field["name"]} · Kiểu dán:' if field else 'Chọn cột để xem kiểu dán:')
-        if field:self.paste_mode_choice.current(1 if field.get('paste_mode')=='date_dmy' else 0)
+        if field:self.paste_mode_choice.current(('text','date_dmy','date_dmy_auto').index(field.get('paste_mode','text')))
         else:self.paste_mode_choice.set('')
 
     def refresh(self):
@@ -214,7 +215,7 @@ class HisPanel:
             if item==2:enabled=enabled and index>0
             if item==3:enabled=enabled and index<len(self.model.fields)-1
             self.field_menu.entryconfigure(item,state='normal' if enabled else 'disabled')
-        for item in (6,7):self.field_menu.entryconfigure(item,state='normal' if idle and field else 'disabled')
+        for item in (6,7,8):self.field_menu.entryconfigure(item,state='normal' if idle and field else 'disabled')
 
     def set_paste_mode(self,mode):
         field=self.selected_field()
@@ -222,7 +223,7 @@ class HisPanel:
         self.commit_editor();self.app.date_paste.clear()
         try:
             self.model.set_paste_mode(field['id'],mode);self.refresh()
-            self.info.configure(text=f'{field["name"]}: '+('chọn ô ngày đầu tiên trên HIS rồi Ctrl+V, nhả Ctrl để điền ngày / tháng / năm.' if mode=='date_dmy' else 'dán văn bản vào một ô.'))
+            self.info.configure(text=f'{field["name"]}: '+('chọn ô ngày đầu tiên trên HIS rồi Ctrl+V, nhả Ctrl để điền ngày / tháng / năm. '+('HIS tự chuyển ô; không gửi thêm Tab.' if mode=='date_dmy_auto' else 'Dùng Tab để chuyển ô.') if mode in ('date_dmy','date_dmy_auto') else 'dán văn bản vào một ô.'))
         except (ValueError,OSError) as error:self.app.notify_app('Chưa đổi được kiểu dán',str(error))
 
     def open_field_menu(self,event):
@@ -486,7 +487,7 @@ class HisPanel:
             first=next((action for action in self.app.manager.recorder.actions if action.action_type in ('copy_field','paste_date')),None)
             if first and first.data_row!=row+1:
                 self.app.notify_app('Hãy lấy cùng một STT',f'Lượt học này đang lấy STT {first.data_row}. Chọn các trường trên cùng hàng đó.');return 'break'
-        is_date=field.get('paste_mode')=='date_dmy'
+        is_date=field.get('paste_mode') in ('date_dmy','date_dmy_auto')
         try:
             if is_date:
                 from date_paste import date_parts
@@ -494,7 +495,9 @@ class HisPanel:
             set_clipboard_text(value)
             if is_date:
                 recorder=self.app.manager.recorder
-                self.app.date_paste.arm(value,lambda:recorder.record_date_field(field_id,field['name'],row+1) if state==self.app.manager.STATE_RECORDING else None)
+                callback=lambda:recorder.record_date_field(field_id,field['name'],row+1) if state==self.app.manager.STATE_RECORDING else None
+                if field.get('paste_mode')=='date_dmy_auto':self.app.date_paste.arm(value,callback,navigation='auto')
+                else:self.app.date_paste.arm(value,callback)
         except (OSError,ValueError,RuntimeError) as error:
             self.app.notify_app('Chưa sao chép được',str(error));return 'break'
         if state==self.app.manager.STATE_RECORDING:

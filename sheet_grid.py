@@ -101,7 +101,7 @@ class SheetGrid(tk.Canvas):
     def draw(self):
         self.delete('all');self.geometry_cells()
         self.configure(scrollregion=(0,0,self.edges[-1]+1,self.winfo_height()))
-        headings=['STT']+[field['name']+(' · Ngày → 3 ô' if field.get('paste_mode')=='date_dmy' else '') for field in self.fields]+['+']
+        headings=['STT']+[field['name']+(' · HIS tự chuyển' if field.get('paste_mode')=='date_dmy_auto' else ' · Ngày → 3 ô' if field.get('paste_mode')=='date_dmy' else '') for field in self.fields]+['+']
         for column,heading in enumerate(headings):
             left,right=self.edges[column:column+2]
             self.create_rectangle(left,1,right,self.header_height,fill='#e7dfce',outline='#b9b0a1')

@@ -16,10 +16,12 @@ from ui import HocVetApp
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture',type=Path,default=Path(__file__).resolve().parent.parent/'GiaLapHis'/'ban-chay-truc-tiep.html',help='Trang HTML HIS giả lập trên máy')
-    fixture=parser.parse_args().fixture.resolve()
+    parser.add_argument('--auto-advance',action='store_true',help='Giả lập HIS tự chuyển ô khi ngày / tháng đủ hai chữ số')
+    args=parser.parse_args()
+    fixture=args.fixture.resolve()
     if not fixture.is_file():parser.error(f'Không tìm thấy trang HIS giả lập: {fixture}')
-    output=Path('build/his-learning');output.mkdir(parents=True,exist_ok=True)
-    dates=['19/08/1987','29/02/2000','01/12/1995','31/01/1970','09/09/2009']
+    output=Path('build/his-learning-auto' if args.auto_advance else 'build/his-learning');output.mkdir(parents=True,exist_ok=True)
+    dates=['19/08/1989','29/02/2000','01/12/1995','31/01/1970','09/09/2009']
     report={'dates':dates,'runs':[],'messages':[]}
     with tempfile.TemporaryDirectory(dir=output) as directory,sync_playwright() as playwright:
         browser=playwright.chromium.launch(channel='chrome',headless=False,args=['--window-size=1500,1000','--window-position=0,0'])
@@ -57,10 +59,18 @@ def main():
             keys.press(keyboard.Key.ctrl_l);keys.press('v');keys.release('v');keys.release(keyboard.Key.ctrl_l)
             pump(.2);report['before_configuration']=values()
             assert report['before_configuration']==['19','01','1999','KEEP'],report['before_configuration']
+            if args.auto_advance:
+                page.evaluate('''() => {
+                    for (const [id,next] of [['birth_day','birth_month'],['birth_month','birth_year']]) {
+                        document.getElementById(id).addEventListener('input',event => {
+                            if(event.target.value.length===2) document.getElementById(next).focus();
+                        });
+                    }
+                }''')
             app.his_panel.show_selection()
-            app.his_panel.paste_mode_choice.current(1)
+            app.his_panel.paste_mode_choice.current(2 if args.auto_advance else 1)
             app.his_panel.paste_mode_choice.event_generate('<<ComboboxSelected>>')
-            assert app.his.fields[0].get('paste_mode')=='date_dmy'
+            assert app.his.fields[0].get('paste_mode')==('date_dmy_auto' if args.auto_advance else 'date_dmy')
             app._cmd_start_recording(force_countdown=True)
             pump(3.5)
             assert app.manager.state==app.manager.STATE_RECORDING
@@ -75,7 +85,7 @@ def main():
             deadline=time.monotonic()+5
             while (app.date_paste.pending or app.date_paste.busy) and time.monotonic()<deadline:pump(.03)
             report['learning']=values()
-            assert report['learning']==['19','08','1987','KEEP'],report
+            assert report['learning']==['19','08','1989','KEEP'],report
             app._cmd_stop_recording();pump(.15)
             report['actions']=[action.to_dict() for action in profile.actions]
             assert any(action.action_type=='mouse_click' for action in profile.actions),report['actions']

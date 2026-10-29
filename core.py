@@ -577,7 +577,8 @@ class MacroPlayer:
                 # Ctrl vật lý có thể đã được ghi trước bước dán ngày.
                 for key in (keyboard.Key.ctrl_l,keyboard.Key.ctrl_r):
                     self.keyboard_controller.release(key)
-                paste_date(value,self.keyboard_controller,self._abort_event,self.protect_keyboard)
+                paste_date(value,self.keyboard_controller,self._abort_event,self.protect_keyboard,
+                    navigation=getattr(self.field_reader,'date_navigation',{}).get(action.data_field,'tab'))
             else:set_clipboard_text(value,self._abort_event)
             if self.on_field_copied:
                 self.on_field_copied(getattr(self.field_reader,'environment_id',None),

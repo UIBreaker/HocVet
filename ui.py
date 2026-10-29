@@ -1927,6 +1927,16 @@ Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; k
 
 
 def run_app():
+    from single_instance import SingleInstance
+    instance=SingleInstance()
+    if not instance.primary:
+        instance.close();return
+    try:
+        _run_primary_app(instance)
+    finally:instance.close()
+
+
+def _run_primary_app(instance):
     enable_dpi_awareness()
     root = tk.Tk()
     apply_theme(root, root.winfo_fpixels('1i') / 96)
@@ -1938,6 +1948,11 @@ def run_app():
             f'Không thể đọc thư viện hoặc bản dự phòng. Dữ liệu được giữ nguyên.\n\n{error}', parent=root)
         root.destroy()
         return
+    def check_open_request():
+        if app._closing:return
+        if instance.requested():app._show_from_tray()
+        root.after(250,check_open_request)
+    root.after(250,check_open_request)
     root.mainloop()
 
 

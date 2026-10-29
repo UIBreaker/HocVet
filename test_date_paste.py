@@ -36,6 +36,13 @@ class DateTests(unittest.TestCase):
             paste_date('19/08/1987',ctrl,cancel,target=123)
         ctrl.press.assert_not_called()
 
+    def test_auto_advance_does_not_send_extra_tabs(self):
+        controller=Mock();cancel=Mock();cancel.is_set.return_value=False;cancel.wait.return_value=False
+        with patch('date_paste.ctypes.windll.user32.GetForegroundWindow',return_value=123),patch('date_paste.set_clipboard_text') as clipboard:
+            paste_date('19/08/1989',controller,cancel,navigation='auto')
+        self.assertEqual([call.args[0] for call in clipboard.call_args_list],['19','08','1989','19/08/1989'])
+        self.assertNotIn(unittest.mock.call(keyboard.Key.tab),controller.press.call_args_list)
+
     def test_hook_one_shot_and_recorder_skips_original_v(self):
         helper=DatePaste(lambda:False,Mock());helper.listener=Mock()
         recorder=MacroRecorder();recorder.is_recording=True
@@ -138,6 +145,17 @@ class DataTests(unittest.TestCase):
         self.model.prepare([old],1)
         self.model.set_paste_mode(field,'date_dmy')
         with self.assertRaisesRegex(ValueError,'kịch bản cũ'):self.model.prepare([old],1)
+
+    def test_navigation_uses_saved_column_mode_when_replaying_existing_date_script(self):
+        field=self.model.add_field('Ngày sinh');self.model.set_cell(0,field,'19/08/1989')
+        action=MacroAction('paste_date',0,data_field=field,data_row=1)
+        self.model.set_paste_mode(field,'date_dmy_auto')
+        loaded=HisEnvironment(self.model.path)
+        _,reader=loaded.prepare([action],1)
+        with patch('core.mouse.Controller'),patch('core.keyboard.Controller'):player=MacroPlayer()
+        player.field_reader=reader
+        with patch('date_paste.paste_date') as paste:player._execute_action(action)
+        self.assertEqual(paste.call_args.kwargs['navigation'],'auto')
 
 
 if __name__=='__main__':unittest.main()

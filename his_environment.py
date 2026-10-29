@@ -44,7 +44,7 @@ class HisEnvironment:
         if not isinstance(fields,list) or len(fields)>cls.MAX_FIELDS: raise ValueError('Tối đa 50 trường dữ liệu.')
         ids=set();names=set()
         for field in fields:
-            if isinstance(field,dict) and field.get('paste_mode','text') not in ('text','date_dmy'):raise ValueError('Kiểu dán trường không hợp lệ.')
+            if isinstance(field,dict) and field.get('paste_mode','text') not in ('text','date_dmy','date_dmy_auto'):raise ValueError('Kiểu dán trường không hợp lệ.')
             if not isinstance(field,dict) or not isinstance(field.get('id'),str) or not 1<=len(field['id'])<=80:
                 raise ValueError('Mã trường không hợp lệ.')
             if field['id'] in ('stt','add') or not all(char.isascii() and (char.isalnum() or char in '_-') for char in field['id']):
@@ -119,7 +119,7 @@ class HisEnvironment:
         self._save(remaining,remaining[0]['id'],deleted_fields=deleted)
 
     def set_paste_mode(self,field_id,mode):
-        if mode not in ('text','date_dmy') or not any(field['id']==field_id for field in self.fields):
+        if mode not in ('text','date_dmy','date_dmy_auto') or not any(field['id']==field_id for field in self.fields):
             raise ValueError('Kiểu dán hoặc trường không hợp lệ.')
         self.update(fields=[dict(field,paste_mode=mode) if field['id']==field_id else field for field in self.fields])
 
@@ -195,7 +195,7 @@ class HisEnvironment:
             target=action.data_field if action.data_field in ids else names.get((action.data_label or '').strip().casefold())
             if not target:raise ValueError(f'Thiếu trường {action.data_label or action.data_field}. Thêm trường cùng tên hoặc học lại trường trên máy này.')
             field=next(item for item in fields if item['id']==target)
-            if action.action_type=='copy_field' and field.get('paste_mode')=='date_dmy':
+            if action.action_type=='copy_field' and field.get('paste_mode') in ('date_dmy','date_dmy_auto'):
                 raise ValueError(f'Cột {field["name"]} đang dán ngày vào 3 ô HIS nhưng kịch bản cũ chỉ sao chép vào 1 ô. Hãy học lại bước ngày: sao chép từ bảng, chọn ô ngày trên HIS rồi Ctrl+V.')
             if action.data_field in resolved and resolved[action.data_field]!=target:
                 raise ValueError('Tham chiếu trường trong kịch bản không nhất quán. Hãy học lại bước lấy dữ liệu.')
@@ -219,4 +219,5 @@ class HisEnvironment:
             return snapshot[row-1][resolved[field]]
         read.environment_id=source['id']
         read.field_ids=resolved
+        read.date_navigation={source_id:'auto' if next(field for field in fields if field['id']==target_id).get('paste_mode')=='date_dmy_auto' else 'tab' for source_id,target_id in resolved.items()}
         return effective,read

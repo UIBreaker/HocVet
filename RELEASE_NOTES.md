@@ -1,3 +1,21 @@
+# Học Vẹt v0.21.0
+
+- Hỗ trợ trường ngày tự chuyển ô của HIS: chọn **Ngày → 3 ô (HIS tự chuyển ô)** để không gửi thêm Tab sau ngày và tháng. Giữ chế độ Tab cho HIS không tự chuyển. Cả lúc học và phát lại đều dùng kiểu dán đã lưu của cột.
+- Dùng mutex Windows để chỉ mở một phiên ứng dụng, độc lập vị trí EXE. Lần mở thêm gửi yêu cầu mở lại cửa sổ hiện có; đang bận thì giữ tiêu điểm công việc. Windows tự giải phóng khóa khi tiến trình kết thúc.
+- Kiểm tra hai kiểu trường qua học/lưu/nạp lại và chạy 5 hàng tại 1×, 10×; kiểm tra sáu tiến trình mở thêm, gọi lại phiên đầu và mở lại sau khi phiên đầu bị ngắt. Chưa kiểm tra trực tiếp trên HIS thật.
+
+## Nâng cấp và tải về
+
+Đóng hết các phiên bản cũ trước lần mở 0.21.0 đầu tiên, rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.21.0-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+Chọn đúng kiểu chuyển ô của cột ngày trong môi trường HIS. Kịch bản đã có bước dán ngày dùng kiểu đã lưu của cột; kịch bản cũ chỉ sao chép một ô cần học lại bước dán ngày. Đã kiểm tra trên HIS giả lập; chưa xác minh trên HIS thực tế. Các phím đã gán, kể cả Esc, chỉ hoạt động ở chế độ **Dùng phím đã gán**.
+
+---
+
 # Học Vẹt v0.20.3
 
 - Giữ thời gian ổn định ô đích trước khi dán ngày ở tốc độ cao, kiểm tra lại cửa sổ nhận dữ liệu để tránh dán lệch ô.
