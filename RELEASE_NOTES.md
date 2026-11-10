@@ -1,3 +1,20 @@
+# Học Vẹt v0.22.1
+
+- Tinh chỉnh hiệu ứng mượt mà và nút bấm micro-animation phản hồi xúc giác cơ học (có thể bật/tắt trong Cài đặt `animations_enabled`), tối ưu khởi động ứng dụng nhanh tức thì thông qua nạp lười mô-đun.
+- Bảng điều khiển nổi: Bổ sung điều chỉnh tốc độ chạy kịch bản (0.25x – 50x) trực tiếp trên bảng, đổi màu phân biệt nút '‹ Trước' / 'Sau ›' rõ ràng, tiêu đề kịch bản hiển thị đậm nét, dễ quan sát.
+- Giao diện tab: Gom gọn thanh menu native trùng lặp, tối ưu thanh Tab phong cách retro hiện đại, loại bỏ hoàn toàn tab công việc riêng thừa thãi.
+- Tiện ích mở rộng (Plugin): Ẩn hoàn toàn nút "Gỡ tiện ích" và nút "Mở môi trường" khi chưa cài đặt; bổ sung thanh tiến trình tải cài đặt/gỡ cài đặt sinh động kèm thông báo thành công và bảo lưu dữ liệu an toàn.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản đang chạy rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt được giữ tại `%LOCALAPPDATA%\HocVet`; không xóa thư mục này.
+
+- `HocVet.exe`: chạy trực tiếp trên Windows, không cần Python.
+- `HocVet-v0.22.1-Windows.zip`: ứng dụng, README, ảnh hướng dẫn và giấy phép.
+- `SHA256SUMS.txt`: mã kiểm tra EXE và ZIP.
+
+---
+
 # Học Vẹt v0.21.1
 
 - Sửa kiểu dán ngày mặc định: nhận diện ô bàn phím bằng Windows UI Automation, chỉ gửi Tab khi HIS chưa tự chuyển sang ô tiếp theo. Tránh ngày vào ô ngày, tháng vào ô năm và năm vào ô phụ khi HIS đã tự chuyển ô.

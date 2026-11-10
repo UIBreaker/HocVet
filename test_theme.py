@@ -200,6 +200,31 @@ class ThemeTests(unittest.TestCase):
         finally:
             notice.close()
 
+    def test_panel_speed_controls_and_navigation_colors(self):
+        from record_notice import RecordNotice
+        from core import ScriptProfile
+        from unittest.mock import Mock
+        notice = RecordNotice(self.root)
+        self.addCleanup(lambda: notice.close(force=True))
+        speed_mock = Mock()
+        repeat_mock = Mock()
+        p1 = ScriptProfile(name='Kịch bản khám A', speed=1.0)
+        p2 = ScriptProfile(name='Kịch bản khám B', speed=2.5)
+        notice.pin([p1, p2], Mock(), Mock(), Mock(), on_repeat=repeat_mock, on_speed=speed_mock)
+        self.root.update()
+
+        # Check title clarity (high contrast foreground and bold font)
+        self.assertEqual(notice.name_labels[0].cget('fg'), '#181512')
+
+        # Check speed buttons existence and invoke
+        self.assertGreaterEqual(len(notice.speed_buttons), 3)
+        # Click + speed on p1 (speed 1.0 -> 2.0)
+        notice.speed_buttons[2].invoke()
+        speed_mock.assert_called_with(p1.id, 2.0)
+        # Click center speed button on p1 (opens custom input with None)
+        notice.speed_buttons[1].invoke()
+        speed_mock.assert_called_with(p1.id, None)
+
 
 class PackageTests(unittest.TestCase):
     def test_package_manifest_and_checksums_exclude_personal_library(self):

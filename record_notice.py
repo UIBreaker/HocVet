@@ -4,7 +4,7 @@ from ctypes import wintypes
 import tkinter as tk
 from tkinter import ttk
 
-from ui_theme import VINTAGE_BG, VINTAGE_TEXT_HEAD, VINTAGE_TEXT_BODY, VINTAGE_CARD_BG, BTN_RED_TOP, FONT_BODY
+from ui_theme import VINTAGE_BG, VINTAGE_TEXT_HEAD, VINTAGE_TEXT_BODY, VINTAGE_CARD_BG, VINTAGE_CARD_BORDER, BTN_RED_TOP, FONT_BODY
 
 
 class RecordNotice:
@@ -19,7 +19,7 @@ class RecordNotice:
         self.profiles = []
         self.launcher = None
         self.on_run = self.on_stop = self.on_open = None
-        self.on_repeat = self.on_resize = None
+        self.on_repeat = self.on_speed = self.on_resize = None
         self.size = None
         self.per_page = 3
         self._layout_timer = None
@@ -32,12 +32,12 @@ class RecordNotice:
         self.hidden=False;self.on_hide=None;self.on_geometry=None
         self.moving=False
 
-    def pin(self, profiles, on_run, on_stop, on_open, activation='mouse', *, on_repeat=None, size=None, on_resize=None):
+    def pin(self, profiles, on_run, on_stop, on_open, activation='mouse', *, on_repeat=None, on_speed=None, size=None, on_resize=None):
         self.pinned = True
         self.activation = activation
         self.profiles = list(profiles)
         self.on_run, self.on_stop, self.on_open = on_run, on_stop, on_open
-        self.on_repeat,self.on_resize = on_repeat,on_resize
+        self.on_repeat, self.on_speed, self.on_resize = on_repeat, on_speed, on_resize
         if size is not None: self.size = tuple(size)
         self.show('HỌC VẸT · BẢNG ĐIỀU KHIỂN', 'Chọn kịch bản bên dưới để chạy.' if activation=='mouse'
             else 'Dùng phím đã gán để Học / Chạy / Dừng. Các nút kích hoạt bằng chuột đang khóa.', progress=0)
@@ -69,13 +69,15 @@ class RecordNotice:
             font=('Segoe UI', 9, 'bold')).pack(anchor='w')
         self.run_buttons = []
         self.repeat_buttons = []
+        self.speed_buttons = []
         self.slots = []
         self.name_labels = []
         rows = self.rows = tk.Frame(self.launcher,bg=VINTAGE_BG)
         rows.pack(fill='both',expand=True)
         rows.bind('<Configure>',self._queue_layout)
         for index in range(per_page):
-            slot = tk.Frame(rows, bg=VINTAGE_CARD_BG, padx=10, pady=6)
+            slot = tk.Frame(rows, bg=VINTAGE_CARD_BG, padx=10, pady=6,
+                            highlightbackground=VINTAGE_CARD_BORDER, highlightthickness=1)
             slot.pack(fill='both',expand=True,pady=(5,0))
             slot.bind('<Configure>',self._queue_layout)
             self.slots.append(slot)
@@ -84,7 +86,7 @@ class RecordNotice:
             profile = self.profiles[offset] if offset < len(self.profiles) else None
             label = profile.name if profile else '—'
             name = tk.Label(slot, text=label, anchor='w', justify='left', wraplength=235,
-                height=2, font=('Segoe UI', 10, 'bold'), bg=VINTAGE_CARD_BG, fg=VINTAGE_TEXT_HEAD)
+                height=2, font=('Segoe UI', 11, 'bold'), bg=VINTAGE_CARD_BG, fg='#181512')
             name.grid(row=0,column=0,sticky='ew')
             self.name_labels.append(name)
             meta = f'{len(profile.actions):,} bước · {"Dùng chuột" if self.activation=="mouse" else profile.hotkey or "Chưa gán phím"}' if profile else ' '
@@ -95,8 +97,8 @@ class RecordNotice:
             button.configure(state='disabled' if self.activation!='mouse' or self.busy or not profile or not profile.actions or not profile.enabled else 'normal')
             self.run_buttons.append(button)
             repeats = tk.Frame(slot,bg=VINTAGE_CARD_BG)
-            repeats.grid(row=2,column=0,columnspan=2,sticky='w',pady=(5,0))
-            tk.Label(repeats,text='Lặp',font=FONT_BODY,bg=VINTAGE_CARD_BG,fg=VINTAGE_TEXT_BODY).pack(side='left',padx=(0,8))
+            repeats.grid(row=2,column=0,columnspan=2,sticky='w',pady=(4,0))
+            tk.Label(repeats,text='Lặp',font=('Segoe UI', 9, 'bold'),width=6,anchor='w',bg=VINTAGE_CARD_BG,fg=VINTAGE_TEXT_BODY).pack(side='left')
             count = profile.loop_count if profile else 1
             for caption, value in (('−',max(0,count-1)), ('Liên tục' if count==0 else f'{count} lần',None), ('+',count+1)):
                 edit = ttk.Button(repeats,text=caption,width=9 if value is None else 3,takefocus=False,
@@ -104,12 +106,30 @@ class RecordNotice:
                 edit.pack(side='left',padx=(0,4))
                 edit.configure(state='disabled' if self.busy or not profile or not self.on_repeat else 'normal')
                 self.repeat_buttons.append(edit)
+            speeds = tk.Frame(slot,bg=VINTAGE_CARD_BG)
+            speeds.grid(row=3,column=0,columnspan=2,sticky='w',pady=(3,0))
+            tk.Label(speeds,text='Tốc độ',font=('Segoe UI', 9, 'bold'),width=6,anchor='w',bg=VINTAGE_CARD_BG,fg=VINTAGE_TEXT_BODY).pack(side='left')
+            spd = profile.speed if profile else 1.0
+            prev_spd = max(1.0, round(spd - 1.0, 1))
+            next_spd = min(10.0, round(spd + 1.0, 1))
+            for caption, value in (('−',prev_spd), (f'{spd:g}×',None), ('+',next_spd)):
+                btn = ttk.Button(speeds,text=caption,width=9 if value is None else 3,takefocus=False,
+                    command=lambda p=profile,v=value:self.on_speed(p.id,v) if p and self.on_speed else None)
+                btn.pack(side='left',padx=(0,4))
+                is_disabled = (
+                    self.busy or not profile or not self.on_speed or
+                    (caption == '−' and spd <= 1.0) or
+                    (caption == '+' and spd >= 10.0)
+                )
+                btn.configure(state='disabled' if is_disabled else 'normal')
+                self.speed_buttons.append(btn)
         navigation = ttk.Frame(self.launcher)
         navigation.pack(side='bottom',fill='x',pady=6,before=rows)
-        ttk.Button(navigation, text='‹ Trước', width=6, takefocus=False, command=lambda:self._page(-1),
+        ttk.Button(navigation, text='‹ Trước', style='Info.TButton', width=8, takefocus=False, command=lambda:self._page(-1),
             state='normal' if self.page and not self.busy else 'disabled').pack(side='left')
-        ttk.Label(navigation, text=f'{self.page+1}/{pages} · {len(self.profiles)} kịch bản').pack(side='left', expand=True)
-        ttk.Button(navigation, text='Sau ›', width=6, takefocus=False, command=lambda:self._page(1),
+        ttk.Label(navigation, text=f'{self.page+1}/{pages} · {len(self.profiles)} kịch bản',
+                  font=('Segoe UI', 9, 'bold'), foreground='#181512').pack(side='left', expand=True)
+        ttk.Button(navigation, text='Sau ›', style='Info.TButton', width=8, takefocus=False, command=lambda:self._page(1),
             state='normal' if self.page+1 < pages and not self.busy else 'disabled').pack(side='right')
         footer = ttk.Frame(self.launcher)
         footer.pack(side='bottom',fill='x',before=navigation)

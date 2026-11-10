@@ -1,19 +1,21 @@
-# Học Vẹt · v0.21.1
+# Học Vẹt · v0.22.1
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.21.1
+## Có gì mới trong 0.22.1
 
-- Kiểu dán ngày mặc định **tự nhận biết HIS đã chuyển ô**, chỉ gửi Tab khi còn ở ô cũ, tránh bỏ qua ô tháng.
-- Dừng và báo lỗi khi không xác định được ô nhập; kịch bản đã có bước dán ngày tiếp tục dùng được.
+- Tinh chỉnh hiệu ứng mượt mà và nút bấm micro-animation phản hồi nhạy (có thể bật/tắt trong Cài đặt), tối ưu khởi động ứng dụng nhanh tức thì.
+- Bảng điều khiển nổi: Bổ sung điều chỉnh tốc độ chạy kịch bản (0.25x – 50x) trực tiếp trên bảng, đổi màu nút 'Trước' / 'Sau' rõ ràng, tiêu đề kịch bản hiển thị đậm nét, dễ nhìn.
+- Giao diện tab: Gom gọn thanh menu trùng lặp, tối ưu thanh Tab phong cách retro hiện đại, loại bỏ tab công việc riêng thừa thãi.
+- Tiện ích mở rộng (Plugin): Ẩn hoàn toàn nút "Gỡ tiện ích" và nút "Mở môi trường" khi chưa cài đặt; bổ sung thanh tiến trình cài đặt/gỡ cài đặt sinh động kèm thông báo thành công.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.21.1-Windows.zip** tại [bản phát hành 0.21.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.21.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+Tải **HocVet.exe** hoặc **HocVet-v0.22.1-Windows.zip** tại [bản phát hành 0.22.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.22.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
 
 Đóng phiên bản đang chạy trước khi mở EXE mới. Nếu nâng cấp từ bản trước 0.21.0, đóng hết các phiên cũ một lần để cơ chế một phiên có hiệu lực. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 

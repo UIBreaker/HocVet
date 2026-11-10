@@ -26,9 +26,18 @@ from typing import List, Dict, Any, Optional, Callable
 
 from pynput import mouse, keyboard
 from app_info import APP_VERSION
-from conditions import condition_check, decode_reference
 from clipboard_text import set_clipboard_text
 from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity, hotkey_identities
+
+
+def condition_check(action):
+    from conditions import condition_check as _cc
+    return _cc(action)
+
+
+def decode_reference(encoded):
+    from conditions import decode_reference as _dr
+    return _dr(encoded)
 
 
 # ==========================================
@@ -882,6 +891,7 @@ class MacroManager:
         self.minimize_to_tray_on_close = True
         self.panel_size = None
         self.script_activation = 'mouse'
+        self.animations_enabled = True
 
         # Global HotKeys Listener
         self._global_hotkeys: Optional[keyboard.GlobalHotKeys] = None
@@ -973,6 +983,7 @@ class MacroManager:
             self.hotkey_record_str = settings.get("hotkey_record", "F8")
             self.hotkey_panic_str = settings.get("hotkey_panic", "ESC")
             self.minimize_to_tray_on_close = settings.get("minimize_to_tray_on_close", True)
+            self.animations_enabled = bool(settings.get("animations_enabled", True))
             activation = settings.get('script_activation', 'mouse')
             self.script_activation = activation if activation in ('mouse', 'hotkey') else 'mouse'
             size = settings.get('panel_size')
@@ -990,6 +1001,7 @@ class MacroManager:
             "panel_size": self.panel_size,
             "button_hotkeys": self.button_hotkeys,
             "button_hotkey_scopes": self.button_hotkey_scopes,
+            "animations_enabled": self.animations_enabled,
         }
         MacroStorage.save_library(self.profiles, self.library_path, settings=settings)
 

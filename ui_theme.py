@@ -40,6 +40,25 @@ FONT_BODY = ("Segoe UI", 9)
 FONT_BTN = ("Segoe UI", 9, "bold")
 
 
+def adjust_color(hex_color: str, factor: float) -> str:
+    """Điều chỉnh độ sáng màu hex (factor > 1 làm sáng, factor < 1 làm tối)."""
+    try:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+        if factor >= 1.0:
+            r = min(255, int(r + (255 - r) * (factor - 1.0)))
+            g = min(255, int(g + (255 - g) * (factor - 1.0)))
+            b = min(255, int(b + (255 - b) * (factor - 1.0)))
+        else:
+            r = max(0, int(r * factor))
+            g = max(0, int(g * factor))
+            b = max(0, int(b * factor))
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except Exception:
+        return hex_color
+
+
 def apply_theme(root, scale):
     root.option_add('*Font', FONT_BODY)
     root.option_add('*Background', VINTAGE_BG)
@@ -52,9 +71,14 @@ def apply_theme(root, scale):
     style.theme_use('clam')
     style.configure('.', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_HEAD, font=FONT_BODY)
     style.configure('TFrame', background=VINTAGE_CARD_BG)
-    style.configure('TNotebook',background=VINTAGE_BG,borderwidth=0)
-    style.configure('TNotebook.Tab',font=FONT_BTN,padding=(6,8),background=BTN_BEIGE_TOP)
-    style.map('TNotebook.Tab',background=[('selected',VINTAGE_CARD_BG)],foreground=[('selected',VINTAGE_TEXT_HEAD)])
+    style.configure('TNotebook', background=VINTAGE_BG, borderwidth=0, tabmargins=[round(8*scale), round(6*scale), round(8*scale), 0])
+    style.configure('TNotebook.Tab', font=('Segoe UI', 10, 'bold'), padding=(round(14*scale), round(7*scale)),
+                    background=BTN_BEIGE_TOP, bordercolor=VINTAGE_CARD_BORDER)
+    style.map('TNotebook.Tab',
+              background=[('selected', VINTAGE_CARD_BG), ('active', adjust_color(BTN_BEIGE_TOP, 1.06))],
+              foreground=[('selected', '#181512'), ('active', '#2b2723'), ('!selected', '#665f54')],
+              lightcolor=[('selected', VINTAGE_CARD_BG)],
+              bordercolor=[('selected', VINTAGE_CARD_BORDER)])
     style.configure('Horizontal.TProgressbar',background=BTN_RED_TOP,troughcolor=VINTAGE_INNER_GROOVE)
     style.configure('TLabel', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY)
     style.configure('TCheckbutton', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY,
@@ -75,7 +99,7 @@ def apply_theme(root, scale):
         style.configure(name, background=top, foreground=text, bordercolor=bottom,
                         lightcolor=top, darkcolor=bottom, relief='raised', borderwidth=2,
                         font=FONT_BTN, padding=(round(10*scale), round(6*scale)), focusthickness=2)
-        style.map(name, background=[('disabled', VINTAGE_INNER_GROOVE), ('pressed', bottom), ('active', top)],
+        style.map(name, background=[('disabled', VINTAGE_INNER_GROOVE), ('pressed', bottom), ('active', adjust_color(top, 1.08))],
                   foreground=[('disabled', VINTAGE_TEXT_MUTED)], relief=[('pressed', 'sunken')])
     style.configure('TSeparator', background=VINTAGE_CARD_BORDER)
     style.configure('TScrollbar', background=BTN_RED_TOP, troughcolor=VINTAGE_INNER_GROOVE,

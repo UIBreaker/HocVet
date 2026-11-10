@@ -559,7 +559,7 @@ class UITest(unittest.TestCase):
 
     def test_tabs_speed_and_app_only_progress_notification(self):
         from tkinter import ttk
-        self.assertEqual(len(self.app.tabs.tabs()), 6)
+        self.assertEqual(len(self.app.tabs.tabs()), 5)
         self.app._cmd_open_settings()
         self.assertEqual(self.app.tabs.select(), str(self.app.settings_tab))
         def descendants(widget):
@@ -873,6 +873,46 @@ class UITest(unittest.TestCase):
             self.assertFalse(app.manager.recorder.is_recording)
             self.assertEqual(self.profile.actions[0].key, 'vk_65')
             self.assertFalse(any('THÀNH CÔNG' in call.args[0] for call in notice.call_args_list))
+
+    def test_button_animation_interaction_and_settings_toggle(self):
+        from ui import Retro3DButton
+        btn = self.app.btn_play
+        clicked = [False]
+        btn.command = lambda: clicked.__setitem__(0, True)
+
+        # 1. Animations enabled (default)
+        btn.animations_enabled = True
+        btn._on_enter()
+        self.assertTrue(btn.hovered)
+        btn._on_press(None)
+        self.assertTrue(btn.pressed)
+        self.assertEqual(btn.offset, 3.0)
+        btn._on_release(None)
+        self.assertFalse(btn.pressed)
+        self.assertTrue(clicked[0])
+        self.assertIsNotNone(btn._anim_timer)
+        btn._cancel_anim()
+        btn._on_leave()
+        self.assertFalse(btn.hovered)
+
+        # 2. Animations disabled
+        clicked[0] = False
+        btn.animations_enabled = False
+        btn._on_press(None)
+        self.assertTrue(btn.pressed)
+        btn._on_release(None)
+        self.assertFalse(btn.pressed)
+        self.assertTrue(clicked[0])
+        self.assertEqual(btn.offset, 0.0)
+        self.assertIsNone(btn._anim_timer)
+
+        # 3. Settings persistence
+        self.app.manager.animations_enabled = False
+        self.app.manager.save_library()
+        self.app.manager.load_library()
+        self.assertFalse(self.app.manager.animations_enabled)
+        self.app.manager.animations_enabled = True
+        self.app.manager.save_library()
 
 
 if __name__ == '__main__':

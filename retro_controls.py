@@ -4,6 +4,8 @@ from ui_theme import VINTAGE_CARD_BG, VINTAGE_TEXT_MUTED, BTN_RED_TOP, BTN_RED_B
 
 
 class RetroSlider(tk.Canvas):
+    animations_enabled = True
+
     def __init__(self, parent, values, command, on_preview=None):
         height = round(50 + 8*parent.winfo_fpixels('1i')/96)
         super().__init__(parent, height=height, bg=VINTAGE_CARD_BG, highlightthickness=0,
@@ -13,6 +15,7 @@ class RetroSlider(tk.Canvas):
         self.position = float(self.index)
         self.command = command
         self.on_preview = on_preview
+        self._anim_timer = None
         self.bind('<Configure>', lambda event: self._draw())
         self.bind('<Button-1>', self._drag)
         self.bind('<B1-Motion>', self._drag)
@@ -21,24 +24,64 @@ class RetroSlider(tk.Canvas):
         self.bind('<Right>', lambda event: self._step(1))
         self.bind('<FocusIn>', lambda event: self._draw())
         self.bind('<FocusOut>', lambda event: self._draw())
+        self.bind('<Destroy>', lambda event: self._cancel_anim(), add='+')
 
-    def set(self, value):
+    def _cancel_anim(self):
+        if self._anim_timer:
+            try:
+                self.after_cancel(self._anim_timer)
+            except Exception:
+                pass
+            self._anim_timer = None
+
+    def _animate_to(self, target_pos):
+        self._cancel_anim()
+        start_pos = self.position
+        diff = target_pos - start_pos
+        steps = 4
+        def glide(step=1):
+            if not self.winfo_exists():
+                return
+            if step <= steps:
+                t = step / steps
+                ease = 1 - (1 - t) * (1 - t)
+                self.position = start_pos + diff * ease
+                self._draw()
+                self._anim_timer = self.after(16, glide, step + 1)
+            else:
+                self.position = target_pos
+                self._draw()
+                self._anim_timer = None
+        glide(1)
+
+    def set(self, value, animate=False):
         self.index = min(range(len(self.values)), key=lambda i: abs(self.values[i]-value))
-        self.position = float(self.index)
+        target_pos = float(self.index)
         for index, (left, right) in enumerate(zip(self.values, self.values[1:])):
             if left <= value <= right and left != right:
-                self.position = index + (value-left)/(right-left)
+                target_pos = index + (value-left)/(right-left)
                 break
-        self._draw()
+        if animate and self.animations_enabled and abs(self.position - target_pos) > 0.05:
+            self._animate_to(target_pos)
+        else:
+            self._cancel_anim()
+            self.position = target_pos
+            self._draw()
 
     def _step(self, offset):
         self.index = max(0, min(len(self.values)-1, self.index+offset))
-        self.position = float(self.index)
-        self._draw()
+        target_pos = float(self.index)
+        if self.animations_enabled:
+            self._animate_to(target_pos)
+        else:
+            self._cancel_anim()
+            self.position = target_pos
+            self._draw()
         self.command(self.values[self.index])
         return 'break'
 
     def _drag(self, event):
+        self._cancel_anim()
         self.focus_set()
         position = (event.x-24) / max(1, self.winfo_width()-48)
         self.index = max(0, min(len(self.values)-1, round(position*(len(self.values)-1))))

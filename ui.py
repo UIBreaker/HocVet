@@ -29,7 +29,6 @@ from ctypes import wintypes
 import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageDraw, ImageFont, ImageTk
-from screen_capture import capture_region
 from record_notice import RecordNotice
 from overlay_input import OverlayInput
 from retro_controls import RetroSlider
@@ -63,7 +62,7 @@ from ui_theme import (
     BTN_YELLOW_TOP, BTN_YELLOW_BOT, BTN_YELLOW_TXT, BTN_GREEN_TOP, BTN_GREEN_BOT, BTN_GREEN_TXT,
     BTN_BLUE_TOP, BTN_BLUE_BOT, BTN_BLUE_TXT, BTN_RED_TOP, BTN_RED_BOT, BTN_RED_TXT,
     BTN_BEIGE_TOP, BTN_BEIGE_BOT, BTN_BEIGE_TXT, FONT_HEADER, FONT_TITLE, FONT_BODY, FONT_BTN,
-    apply_theme, create_dialog, ThemedMessages, ThemedInputs,
+    apply_theme, create_dialog, ThemedMessages, ThemedInputs, adjust_color,
 )
 messagebox = ThemedMessages
 simpledialog = ThemedInputs
@@ -102,7 +101,9 @@ def create_tray_icon_image():
 
 
 class Retro3DButton(tk.Canvas):
-    """Nút bấm 3D bề mặt mờ (Matte) có độ nảy cơ học khi nhấp."""
+    """Nút bấm 3D bề mặt mờ (Matte) có độ nảy cơ học và chuyển động mượt mà khi tương tác."""
+    animations_enabled = True
+
     def __init__(
         self,
         parent,
@@ -138,11 +139,17 @@ class Retro3DButton(tk.Canvas):
         self.font = font
         self.radius = radius
         self.pressed = False
+        self.hovered = False
+        self.offset = 0.0
         self.state = "normal"
+        self._anim_timer = None
 
         self.bind('<Configure>', self._resize)
         self.bind("<ButtonPress-1>", self._on_press)
         self.bind("<ButtonRelease-1>", self._on_release)
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Destroy>", self._on_destroy, add='+')
         self.configure(takefocus=True)
         self.bind('<Return>', self._activate)
         self.bind('<space>', self._activate)
@@ -155,10 +162,56 @@ class Retro3DButton(tk.Canvas):
             self.width, self.height = event.width, event.height
             self._draw()
 
+    def _cancel_anim(self):
+        if self._anim_timer:
+            try:
+                self.after_cancel(self._anim_timer)
+            except Exception:
+                pass
+            self._anim_timer = None
+
+    def _on_destroy(self, event=None):
+        self._cancel_anim()
+
+    def _on_enter(self, event=None):
+        if self.state == "disabled":
+            return
+        self.hovered = True
+        self._draw()
+
+    def _on_leave(self, event=None):
+        self.hovered = False
+        if self.pressed:
+            self.pressed = False
+            self.offset = 0.0
+        self._cancel_anim()
+        self._draw()
+
     def _activate(self, event=None):
         if self.state != 'disabled' and self.command:
-            self.command()
+            if self.animations_enabled:
+                self._animate_press_release(self.command)
+            else:
+                self.command()
         return 'break'
+
+    def _animate_press_release(self, command):
+        """Mô phỏng chu kỳ nhấn nảy cơ học đầy đủ khi kích hoạt qua phím."""
+        self._cancel_anim()
+        frames = [3.0, 1.5, -0.8, 0.0]
+        def step(idx=0):
+            if not self.winfo_exists():
+                return
+            if idx < len(frames):
+                self.offset = frames[idx]
+                self._draw()
+                self._anim_timer = self.after(16, step, idx + 1)
+            else:
+                self._anim_timer = None
+        self.offset = 2.0
+        self._draw()
+        self._anim_timer = self.after(16, step, 0)
+        command()
 
     def _draw_round_rect(self, x1, y1, x2, y2, r, **kwargs):
         points = [
@@ -171,7 +224,7 @@ class Retro3DButton(tk.Canvas):
 
     def _draw(self):
         self.delete("all")
-        offset = 3 if self.pressed else 0
+        offset = round(self.offset)
         w, h = self.width, self.height
         r = self.radius
 
@@ -179,13 +232,27 @@ class Retro3DButton(tk.Canvas):
             t_col = BTN_BEIGE_TOP
             b_col = BTN_BEIGE_BOT
             txt_col = VINTAGE_TEXT_MUTED
+            highlight_col = None
         else:
-            t_col = self.top_color
+            if self.pressed:
+                t_col = adjust_color(self.top_color, 0.94)
+                highlight_col = None
+            elif self.hovered:
+                t_col = adjust_color(self.top_color, 1.08)
+                highlight_col = adjust_color(self.top_color, 1.25)
+            else:
+                t_col = self.top_color
+                highlight_col = adjust_color(self.top_color, 1.15)
             b_col = self.bot_color
             txt_col = self.text_color
 
+        # Lớp chân đế 3D cơ học
         self._draw_round_rect(2, 2, w - 2, h - 2, r, fill=b_col, outline="")
+        # Nắp phím chuyển động theo offset
         self._draw_round_rect(2, 2 + offset, w - 2, h - 6 + offset, r, fill=t_col, outline="")
+        # Viền phản quang mép trên
+        if highlight_col and not self.pressed and h > 20:
+            self.create_line(4 + r, 3 + offset, w - 4 - r, 3 + offset, fill=highlight_col, width=1)
         self.create_text(
             w // 2,
             (h // 2 - 2) + offset,
@@ -201,18 +268,41 @@ class Retro3DButton(tk.Canvas):
             return
         self.focus_set()
         self.pressed = True
+        self._cancel_anim()
+        self.offset = 3.0
         self._draw()
 
     def _on_release(self, event):
         if self.state == "disabled":
             return
         self.pressed = False
-        self._draw()
+        self._cancel_anim()
+        if self.animations_enabled:
+            # Độ nảy lò xo cơ học (spring rebound): 2.0 -> 0.5 -> -0.8 (nảy) -> 0.0 (về vị trí)
+            frames = [2.0, 0.5, -0.8, 0.0]
+            def bounce(idx=0):
+                if not self.winfo_exists():
+                    return
+                if idx < len(frames):
+                    self.offset = frames[idx]
+                    self._draw()
+                    self._anim_timer = self.after(16, bounce, idx + 1)
+                else:
+                    self._anim_timer = None
+            self._anim_timer = self.after(12, bounce, 0)
+        else:
+            self.offset = 0.0
+            self._draw()
         if self.command:
             self.command()
 
     def configure_state(self, state: str):
         self.state = state
+        if state == 'disabled':
+            self.pressed = False
+            self.hovered = False
+            self.offset = 0.0
+            self._cancel_anim()
         self.configure(takefocus=state != 'disabled')
         self.configure(cursor="hand2" if state != "disabled" else "arrow")
         self._draw()
@@ -331,6 +421,8 @@ class HocVetApp:
         enable_dpi_awareness()
 
         # Cài đặt Theme & Xây dựng Giao diện
+        Retro3DButton.animations_enabled = self.manager.animations_enabled
+        RetroSlider.animations_enabled = self.manager.animations_enabled
         self._setup_retro_styles()
         self._build_ui()
         self._sync_his_window()
@@ -339,8 +431,8 @@ class HocVetApp:
         # Khởi động phím tắt toàn cục
         self.manager.start_global_hotkeys()
 
-        # Khởi động Khay hệ thống (System Tray)
-        self._setup_system_tray()
+        # Khởi động Khay hệ thống (System Tray) sau khi cửa sổ sẵn sàng
+        self.root.after(80, self._setup_system_tray)
 
         # Bắt sự kiện đóng cửa sổ
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
@@ -456,21 +548,6 @@ class HocVetApp:
         return card
 
     def _build_ui(self):
-        menu = tk.Menu(self.root)
-        scripts = tk.Menu(menu, tearoff=False)
-        for label, command in (('Tạo kịch bản', self._cmd_add_profile), ('Đổi tên / phím chạy', self._edit_active_profile),
-                ('Nhập file', self._cmd_load_file), ('Chia sẻ file', self._cmd_save_file),
-                ('Sao chép mã', self._cmd_copy_script), ('Dán mã kịch bản', self._cmd_paste_script),
-                ('Xóa kịch bản đang chọn', self._cmd_delete_active_profile)):
-            scripts.add_command(label=label, command=command)
-        menu.add_cascade(label='Kịch bản', menu=scripts)
-        menu.add_command(label='Cài đặt phím tắt', command=self._cmd_open_settings)
-        menu.add_command(label='Tính năng mở rộng',command=lambda:self.tabs.select(self.extensions_tab))
-        menu.add_command(label='Thoát toàn bộ',command=self._exit_app)
-        menu.add_command(label='Hướng dẫn', command=self._cmd_help)
-        menu.add_command(label='Thư mục dữ liệu', command=lambda: os.startfile(os.path.dirname(self.manager.library_path)))
-        menu.add_command(label='Mở / ẩn bảng điều khiển',command=self._toggle_controls)
-        self.root.configure(menu=menu)
         self.status_banner = tk.Label(self.root, text='SẴN SÀNG', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                                       font=('Segoe UI', 10, 'bold'), pady=8, wraplength=700)
         self.status_banner.pack(side=tk.BOTTOM, fill=tk.X)
@@ -478,24 +555,29 @@ class HocVetApp:
         self.tabs.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 0))
         self.content = tk.Frame(self.tabs, bg=VINTAGE_BG)
         self.details = tk.Frame(self.tabs, bg=VINTAGE_BG)
-        self.work_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
         self.settings_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
-        self.extensions_tab = tk.Frame(self.tabs,bg=VINTAGE_BG)
-        self.exit_tab = tk.Frame(self.tabs,bg=VINTAGE_BG)
+        self.extensions_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
+        self.exit_tab = tk.Frame(self.tabs, bg=VINTAGE_BG)
         for frame, label in ((self.content, 'Chính'), (self.details, 'Chi tiết / sửa bước'),
-                             (self.work_tab, 'Công việc riêng'), (self.settings_tab, 'Cài đặt'),
-                             (self.extensions_tab,'Tính năng mở rộng'),(self.exit_tab,'Thoát toàn bộ')):
+                             (self.settings_tab, 'Cài đặt'), (self.extensions_tab, 'Tính năng mở rộng'),
+                             (self.exit_tab, 'Thoát toàn bộ')):
             self.tabs.add(frame, text=label)
-        font=ImageFont.truetype('segoeuib.ttf',max(10,round(self.root.winfo_fpixels('9p'))))
-        bounds=font.getbbox('Thoát toàn bộ')
-        image=Image.new('RGB',(bounds[2]-bounds[0]+16,bounds[3]-bounds[1]+8),BTN_RED_BOT)
-        ImageDraw.Draw(image).text((8-bounds[0],4-bounds[1]),'Thoát toàn bộ',font=font,fill=BTN_RED_TXT)
-        self._exit_tab_image=ImageTk.PhotoImage(image,master=self.root)
-        self.tabs.tab(self.exit_tab,image=self._exit_tab_image,compound='image')
+        pad_x, pad_y = round(10 * self.dpi_scale), round(3 * self.dpi_scale)
+        font = ImageFont.truetype('segoeuib.ttf', max(10, round(self.root.winfo_fpixels('9p'))))
+        bounds = font.getbbox('✕ Thoát')
+        w = bounds[2] - bounds[0] + pad_x * 2
+        h = bounds[3] - bounds[1] + pad_y * 2
+        image = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        draw.rounded_rectangle([(0, 0), (w - 1, h - 1)], radius=4, fill=BTN_RED_BOT)
+        draw.text((pad_x - bounds[0], pad_y - bounds[1]), '✕ Thoát', font=font, fill=BTN_RED_TXT)
+        self._exit_tab_image = ImageTk.PhotoImage(image, master=self.root)
+        self.tabs.tab(self.exit_tab, image=self._exit_tab_image, compound='image')
         self.tabs.bind('<<NotebookTabChanged>>', self._tab_changed)
         self._settings_built = False
         self._settings_bindings = []
-        self.extensions = ExtensionsPanel(self.extensions_tab,self)
+        self.extensions = ExtensionsPanel(self.extensions_tab, self)
+        self.work_tab = tk.Frame()
         self.workspace = WorkspacePanel(self.work_tab, self)
         for name, method in (('open', 'open'), ('learn', 'learn'), ('stop', 'stop'), ('run', 'run'),
                 ('save', 'save'), ('load', 'load'), ('export', 'export'), ('send', '_send_text'), ('windows', '_windows')):
@@ -507,12 +589,14 @@ class HocVetApp:
         tk.Label(header, text='HỌC VẸT', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                  font=('Bahnschrift SemiCondensed', 22, 'bold')).pack(side=tk.LEFT)
         tk.Label(header, text=f'v{APP_VERSION}', bg=VINTAGE_BG, fg=VINTAGE_TEXT_MUTED, font=FONT_BODY).pack(side=tk.LEFT, padx=10)
+        Retro3DButton(header, text='Hướng dẫn', width=88, height=32, top_color=BTN_BEIGE_TOP,
+                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_help).pack(side=tk.RIGHT)
         Retro3DButton(header, text='Cài đặt', width=88, height=32, top_color=BTN_BEIGE_TOP,
-                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_open_settings).pack(side=tk.RIGHT)
+                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_open_settings).pack(side=tk.RIGHT, padx=6)
         Retro3DButton(header, text='Thu vào khay', width=105, height=32, top_color=BTN_BEIGE_TOP,
-                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._hide_to_tray).pack(side=tk.RIGHT, padx=8)
-        Retro3DButton(header,text='Bảng điều khiển',width=125,height=32,top_color=BTN_BEIGE_TOP,
-                      bot_color=BTN_BEIGE_BOT,text_color=BTN_BEIGE_TXT,command=self._toggle_controls).pack(side=tk.RIGHT)
+                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._hide_to_tray).pack(side=tk.RIGHT, padx=6)
+        Retro3DButton(header, text='Bảng điều khiển', width=125, height=32, top_color=BTN_BEIGE_TOP,
+                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._toggle_controls).pack(side=tk.RIGHT)
         select = self._create_section_card(self.content, '01  CHỌN KỊCH BẢN')
         choice_row = tk.Frame(select, bg=VINTAGE_CARD_BG)
         choice_row.pack(fill=tk.X)
@@ -618,7 +702,7 @@ class HocVetApp:
             return
         editing = selected == str(self.settings_tab)
         if editing and (self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy):
-            self.tabs.select(self.work_tab if self.manager.external_busy else self.content)
+            self.tabs.select(self.content)
             return
         if editing and not self._settings_built:
             self._build_settings_tab()
@@ -629,7 +713,7 @@ class HocVetApp:
             else:
                 self.manager.reload_global_hotkeys()
         if hasattr(self, 'workspace'):
-            self.workspace.set_visible(selected == str(self.work_tab))
+            self.workspace.set_visible(False)
         if selected == str(self.details):
             self._refresh_action_tree()
         if selected==str(self.extensions_tab):self.extensions.refresh()
@@ -650,6 +734,8 @@ class HocVetApp:
     # ==========================================
     def _setup_system_tray(self):
         """Khởi tạo icon khay hệ thống Windows."""
+        if self._closing:
+            return
         icon_img = create_tray_icon_image()
 
         def _action_open(icon, item):
@@ -691,6 +777,7 @@ class HocVetApp:
     def _pin_controls(self):
         self.record_notice.pin(self.manager.profiles, self._run_from_panel, self._cmd_emergency_stop,
             self._show_from_tray, self.manager.script_activation, on_repeat=self._set_panel_repeat,
+            on_speed=self._set_panel_speed,
             size=self.manager.panel_size, on_resize=self._save_panel_size)
         self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
         self.record_notice.set_environment_enabled(self.his.installed,self.manager.state in (MacroManager.STATE_IDLE,MacroManager.STATE_RECORDING) and not self.manager.external_busy and self._pending_play is None)
@@ -791,6 +878,33 @@ class HocVetApp:
         self._refresh_profile_deck()
         self.notify_app('Đã lưu số lần lặp', f'{profile.name} · {"Liên tục" if count==0 else str(count)+" lần"}')
 
+    def _set_panel_speed(self, profile_id, value=None):
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
+        profile = next((p for p in self.manager.profiles if p.id==profile_id), None)
+        if not profile: return
+        if value is None:
+            value = simpledialog.askfloat('Tốc độ', f'{profile.name}\nNhập tốc độ từ 1.0 đến 10.0×.',
+                initialvalue=profile.speed, minvalue=1.0, maxvalue=10.0,
+                parent=self.record_notice.window or self.root)
+        if value is None: return
+        try:
+            speed = float(value)
+            if not (1.0 <= speed <= 10.0): raise ValueError()
+        except ValueError:
+            self.notify_app('Tốc độ không hợp lệ', 'Nhập một số từ 1.0 đến 10.0.')
+            return
+        if self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None: return
+        previous = profile.speed
+        profile.speed = round(speed, 2)
+        try:
+            self.manager.save_library()
+        except OSError as error:
+            profile.speed = previous
+            self.notify_app('Chưa lưu được tốc độ', str(error))
+            return
+        self._refresh_profile_deck()
+        self.notify_app('Đã lưu tốc độ', f'{profile.name} · {profile.speed:g}×')
+
     def _save_panel_size(self, width, height):
         previous = self.manager.panel_size
         self.manager.panel_size = [width,height]
@@ -810,7 +924,7 @@ class HocVetApp:
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
-        self.workspace.set_visible(self.tabs.select()==str(self.work_tab))
+        self.workspace.set_visible(False)
 
     def _on_window_close(self):
         """Khi người dùng bấm nút [X] ở góc cửa sổ."""
@@ -1038,6 +1152,8 @@ class HocVetApp:
         self._show_settings_page(0)
         tray_var = tk.BooleanVar(value=self.manager.minimize_to_tray_on_close)
         ttk.Checkbutton(panel, text='Thu nhỏ xuống khay khi bấm đóng [X]', variable=tray_var).pack(anchor='w')
+        anim_var = tk.BooleanVar(value=self.manager.animations_enabled)
+        ttk.Checkbutton(panel, text='Bật hiệu ứng chuyển động & độ nảy nút bấm (Animations)', variable=anim_var).pack(anchor='w', pady=(4, 0))
         activation = self.activation_var = tk.StringVar(value=self.manager.script_activation)
         modes = ttk.Frame(panel)
         modes.pack(fill='x', pady=(6, 0))
@@ -1050,7 +1166,8 @@ class HocVetApp:
             values = {name: value.get().strip() for name, value in variables.items()}
             previous = (self.manager.hotkey_record_str, self.manager.hotkey_panic_str,
                         dict(self.manager.button_hotkeys), dict(self.manager.button_hotkey_scopes),
-                        self.manager.minimize_to_tray_on_close, self.manager.script_activation)
+                        self.manager.minimize_to_tray_on_close, self.manager.script_activation,
+                        self.manager.animations_enabled)
             try:
                 if self.manager.state != MacroManager.STATE_IDLE:
                     raise ValueError('Hãy dừng ghi / chạy trước khi lưu cài đặt.')
@@ -1065,6 +1182,9 @@ class HocVetApp:
                             raise ValueError(f'{SHORTCUT_ACTIONS[name][0]}: phím này chưa được hỗ trợ trong cửa sổ ứng dụng.') from error
                 self.manager.apply_shortcuts(values, {name: 'global' if value.get() == 'Toàn cục' else 'app' for name, value in scopes.items()})
                 self.manager.minimize_to_tray_on_close = tray_var.get()
+                self.manager.animations_enabled = anim_var.get()
+                Retro3DButton.animations_enabled = self.manager.animations_enabled
+                RetroSlider.animations_enabled = self.manager.animations_enabled
                 if activation.get() not in ('mouse', 'hotkey'):
                     raise ValueError('Chọn cách kích hoạt kịch bản hợp lệ.')
                 self.manager.script_activation = activation.get()
@@ -1072,7 +1192,10 @@ class HocVetApp:
             except (ValueError, OSError) as error:
                 (self.manager.hotkey_record_str, self.manager.hotkey_panic_str,
                  self.manager.button_hotkeys, self.manager.button_hotkey_scopes,
-                 self.manager.minimize_to_tray_on_close, self.manager.script_activation) = previous
+                 self.manager.minimize_to_tray_on_close, self.manager.script_activation,
+                 self.manager.animations_enabled) = previous
+                Retro3DButton.animations_enabled = self.manager.animations_enabled
+                RetroSlider.animations_enabled = self.manager.animations_enabled
                 messagebox.showerror('Không thể lưu phím tắt', str(error), parent=win)
                 return
             self._install_shortcuts()
@@ -1089,6 +1212,7 @@ class HocVetApp:
                 variables[name].set(default)
             for name, value in scopes.items():
                 value.set('Toàn cục' if name in ('show', 'stop_record') else 'Trong ứng dụng')
+            anim_var.set(True)
         ttk.Button(buttons, text='Khôi phục phím mặc định', command=reset).pack(side=tk.LEFT)
         ttk.Button(buttons, text='Lưu cài đặt', style='Primary.TButton', command=save).pack(side=tk.RIGHT)
         ttk.Button(buttons, text='Hủy', command=lambda:self.tabs.select(self.content)).pack(side=tk.RIGHT, padx=8)
@@ -1879,6 +2003,7 @@ Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; k
                         summary.configure(text=f'Đã chụp ảnh tại ({result[0]}, {result[1]})')
                 def start_capture():
                     try:
+                        from screen_capture import capture_region
                         capture_region(self.root, complete)
                     except Exception as error:
                         complete(None)

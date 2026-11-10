@@ -15,45 +15,88 @@ class ExtensionsPanel:
         body=ttk.Frame(parent,padding=18);body.pack(fill='both',expand=True)
         heading=ttk.Frame(body);heading.pack(fill='x')
         ttk.Label(heading,text='Tính năng mở rộng',font=('Segoe UI',17,'bold')).pack(side='left')
-        ttk.Label(body,text='Công cụ được thiết kế riêng cho từng công việc.',wraplength=650).pack(anchor='w',pady=(6,20))
+        ttk.Label(body,text='Công cụ và tiện ích (Plugin) được đóng gói riêng cho từng nghiệp vụ.',wraplength=650).pack(anchor='w',pady=(6,20))
         card=ttk.LabelFrame(body,text='Hỗ trợ ĐK KCB HIS',padding=16);card.pack(fill='x')
         ttk.Label(card,text='Bảng dữ liệu dạng ô: học sao chép từng trường ở một hàng, mỗi vòng chạy lấy hàng kế tiếp.',
             wraplength=620).pack(anchor='w')
         ttk.Label(card,text='Gói công cụ đi kèm ứng dụng, cài trên máy không cần tải mạng. Gỡ công cụ sẽ đóng cửa sổ; bảng được giữ để cài lại.',
             wraplength=620).pack(anchor='w',pady=8)
-        self.status=ttk.Label(card);self.status.pack(anchor='w',pady=8)
-        self.progress=ttk.Progressbar(card,mode='indeterminate')
-        actions=ttk.Frame(card);actions.pack(fill='x')
-        self.install=ttk.Button(actions,text='Cài đặt trên máy',style='Primary.TButton',command=lambda:self.change_installation(True))
-        self.install.pack(side='left')
-        self.open=ttk.Button(actions,text='Mở môi trường thao tác',command=app._show_his_environment)
-        self.open.pack(side='left',padx=8)
-        self.remove=ttk.Button(actions,text='Gỡ tiện ích',style='Danger.TButton',command=lambda:self.change_installation(False))
-        self.remove.pack(side='right')
+        self.status=ttk.Label(card,font=('Segoe UI',9,'bold'));self.status.pack(anchor='w',pady=(4,8))
+        self.progress=ttk.Progressbar(card,mode='determinate',maximum=100)
+        self.actions=ttk.Frame(card);self.actions.pack(fill='x',pady=(6,0))
+        self.install=ttk.Button(self.actions,text='Cài đặt trên máy',style='Primary.TButton',command=lambda:self.change_installation(True))
+        self.open=ttk.Button(self.actions,text='Mở môi trường thao tác',style='Primary.TButton',command=app._show_his_environment)
+        self.remove=ttk.Button(self.actions,text='Gỡ tiện ích',style='Danger.TButton',command=lambda:self.change_installation(False))
         self.refresh()
 
     def refresh(self):
         model=self.app.his
-        if not self.busy:self.status.configure(text=model.error or ('ĐÃ CÀI · Sẵn sàng mở cửa sổ Môi trường thao tác' if model.installed else 'CHƯA CÀI · Cài công cụ để bắt đầu'))
         idle=not self.busy and self.app.manager.state==self.app.manager.STATE_IDLE and not self.app.manager.external_busy and self.app._pending_play is None
-        self.install.configure(state='normal' if idle and not model.installed and not model.error else 'disabled')
-        self.remove.configure(state='normal' if idle and model.installed else 'disabled')
-        self.open.configure(state='normal' if model.installed and not self.busy else 'disabled')
+        if not self.busy:
+            if model.error:
+                self.status.configure(text=f'⚠️ {model.error}')
+            elif model.installed:
+                self.status.configure(text='✓ ĐÃ CÀI ĐẶT · Plugin đã sẵn sàng hoạt động.')
+            else:
+                self.status.configure(text='○ CHƯA CÀI ĐẶT · Bấm Cài đặt để tích hợp vào ứng dụng.')
+        if model.installed:
+            self.install.pack_forget()
+            self.open.pack(side='left')
+            self.open.configure(state='normal' if not self.busy else 'disabled')
+            self.remove.pack(side='right')
+            self.remove.configure(state='normal' if idle else 'disabled')
+        else:
+            self.open.pack_forget()
+            self.remove.pack_forget()
+            self.install.pack(side='left')
+            self.install.configure(state='normal' if idle and not model.error else 'disabled')
 
     def change_installation(self,installed):
         if self.busy or self.app._closing or self.app.manager.state!=self.app.manager.STATE_IDLE or self.app.manager.external_busy or self.app._pending_play is not None:return
         if installed==self.app.his.installed:return
         if not installed and not ThemedMessages.askyesno('Gỡ tiện ích','Gỡ Hỗ trợ ĐK KCB HIS và đóng cửa sổ môi trường? Bảng đã nhập được giữ để cài lại.',parent=self.app.root):return
         self.busy=True;self.refresh()
-        self.status.configure(text='Đang cài Hỗ trợ ĐK KCB HIS lên máy…' if installed else 'Đang gỡ Hỗ trợ ĐK KCB HIS…')
-        self.progress.pack(fill='x',pady=(0,10));self.progress.start(12)
-        self.timer=self.app.root.after(450,lambda:self.finish_installation(installed))
+        self.progress.pack(fill='x',pady=(0,10))
+        if installed:
+            self.progress.configure(value=15)
+            self.status.configure(text='Đang cài đặt Hỗ trợ ĐK KCB HIS lên máy (15%)...')
+            def s1():
+                if not self.busy:return
+                self.progress.configure(value=50)
+                self.status.configure(text='Đang cài đặt: Đang thiết lập bảng dữ liệu HIS (50%)...')
+                self.timer=self.app.root.after(150,s2)
+            def s2():
+                if not self.busy:return
+                self.progress.configure(value=85)
+                self.status.configure(text='Đang cài đặt: Đang hoàn thiện tiện ích (85%)...')
+                self.timer=self.app.root.after(150,s3)
+            def s3():
+                if not self.busy:return
+                self.progress.configure(value=100)
+                self.timer=self.app.root.after(100,lambda:self.finish_installation(True))
+            self.timer=self.app.root.after(120,s1)
+        else:
+            self.progress.configure(value=30)
+            self.status.configure(text='Đang gỡ Hỗ trợ ĐK KCB HIS...')
+            def un1():
+                if not self.busy:return
+                self.progress.configure(value=100)
+                self.timer=self.app.root.after(100,lambda:self.finish_installation(False))
+            self.timer=self.app.root.after(140,un1)
 
     def finish_installation(self,installed):
         if self.timer:self.app.root.after_cancel(self.timer);self.timer=None
         try:success=self.app._set_his_installed(installed)
         finally:self.busy=False;self.progress.stop();self.progress.pack_forget();self.refresh()
-        if success:self.status.configure(text='CÀI ĐẶT HOÀN TẤT · Bấm Mở môi trường thao tác để bắt đầu.' if installed else 'ĐÃ GỠ TIỆN ÍCH · Có thể cài lại; dữ liệu bảng được giữ.')
+        if success:
+            if installed:
+                self.status.configure(text='CÀI ĐẶT HOÀN TẤT · Bấm Mở môi trường thao tác để bắt đầu.')
+                if hasattr(self.app,'notify_app'):
+                    self.app.notify_app('Cài đặt thành công','Tiện ích Hỗ trợ ĐK KCB HIS đã được cài đặt lên máy!')
+            else:
+                self.status.configure(text='ĐÃ GỠ TIỆN ÍCH · Có thể cài lại; dữ liệu bảng được giữ.')
+                if hasattr(self.app,'notify_app'):
+                    self.app.notify_app('Đã gỡ tiện ích','Tiện ích Hỗ trợ ĐK KCB HIS đã được gỡ bỏ an toàn.')
 
     def cancel_installation(self):
         if self.timer:self.app.root.after_cancel(self.timer);self.timer=None
