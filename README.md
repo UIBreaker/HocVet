@@ -1,21 +1,23 @@
-# Học Vẹt · v0.22.1
+# Học Vẹt · v0.23.2
 
 Trợ lý ghi và phát lại thao tác chuột / bàn phím trên Windows, dành cho công việc văn phòng và phần mềm HIS.
 
 **Tác giả:** Nhật Nam ([@UIBreaker](https://github.com/UIBreaker)) · **Giấy phép:** [MIT](LICENSE)
 
-## Có gì mới trong 0.22.1
+## Có gì mới trong 0.23.2
 
-- Tinh chỉnh hiệu ứng mượt mà và nút bấm micro-animation phản hồi nhạy (có thể bật/tắt trong Cài đặt), tối ưu khởi động ứng dụng nhanh tức thì.
-- Bảng điều khiển nổi: Bổ sung điều chỉnh tốc độ chạy kịch bản (0.25x – 50x) trực tiếp trên bảng, đổi màu nút 'Trước' / 'Sau' rõ ràng, tiêu đề kịch bản hiển thị đậm nét, dễ nhìn.
-- Giao diện tab: Gom gọn thanh menu trùng lặp, tối ưu thanh Tab phong cách retro hiện đại, loại bỏ tab công việc riêng thừa thãi.
-- Tiện ích mở rộng (Plugin): Ẩn hoàn toàn nút "Gỡ tiện ích" và nút "Mở môi trường" khi chưa cài đặt; bổ sung thanh tiến trình cài đặt/gỡ cài đặt sinh động kèm thông báo thành công.
+- Tạm dừng phát lại khi sai cửa sổ, mất tiêu điểm hoặc hết thời hạn chờ. Bảng nổi hiển thị bước đang vướng và cho phép tiếp tục hoặc dừng.
+- Lưu sự kiện tạm dừng, tiếp tục và dừng vào nhật ký phát lại để dễ kiểm tra.
 
 Chi tiết tại [ghi chú phát hành](RELEASE_NOTES.md).
 
 ## Tải và chạy
 
-Tải **HocVet.exe** hoặc **HocVet-v0.22.1-Windows.zip** tại [bản phát hành 0.22.1](https://github.com/UIBreaker/HocVet/releases/tag/v0.22.1); **SHA256SUMS.txt** dùng để kiểm tra file tải về. Xem bản mới nhất tại [GitHub Releases](https://github.com/UIBreaker/HocVet/releases/latest). Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**; không cần cài Python. Chế độ Web riêng cần Microsoft Edge đã cài. Giao diện hiển thị tên **Học Vẹt**; kho mã tại **UIBreaker/HocVet**.
+- [Tải HocVet.exe cho Windows](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/HocVet.exe)
+- [Tải gói ZIP v0.23.2](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/HocVet-v0.23.2-Windows.zip)
+- [Mã kiểm tra SHA-256](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/SHA256SUMS.txt)
+
+Giải nén ZIP rồi chạy **Học Vẹt.exe**, hoặc chạy trực tiếp **HocVet.exe**. Ứng dụng không yêu cầu cài Python. Chế độ Web riêng cần Microsoft Edge. [Bản phát hành mới nhất trên GitHub](https://github.com/UIBreaker/HocVet/releases/latest)
 
 Đóng phiên bản đang chạy trước khi mở EXE mới. Nếu nâng cấp từ bản trước 0.21.0, đóng hết các phiên cũ một lần để cơ chế một phiên có hiệu lực. Dữ liệu và cài đặt được giữ trong `%LOCALAPPDATA%\HocVet`; không xóa thư mục này khi nâng cấp.
 
@@ -111,7 +113,9 @@ Lưu qua file tạm rồi thay thế; `.bak` giữ lần lưu trước và đư�
 
 - **Chờ cửa sổ:** chờ cửa sổ phía trước có tiêu đề chứa nội dung đã nhập.
 - **Chờ ảnh:** chụp một vùng nhỏ, ổn định; mặc định cho phép 2% pixel khác màu rõ rệt. Ảnh được so sánh ở đúng tọa độ đã chụp, không tìm ở vị trí khác. Giữ cùng bố cục, vị trí cửa sổ, độ phân giải và DPI khi chạy / chia sẻ.
-- **Hết thời hạn:** kịch bản dừng và báo lỗi trước thao tác tiếp theo. Tốc độ phát không rút ngắn thời hạn chờ.
+- **Tạm dừng an toàn:** khi sai cửa sổ, mất tiêu điểm hoặc hết thời hạn chờ, bảng nổi hiển thị kịch bản, bước và lý do. **Tiếp tục** kiểm tra lại tại bước đang vướng. Nếu thao tác đã gửi có kết quả chưa rõ, hãy kiểm tra cửa sổ đích rồi bấm **Tiếp tục** để kết thúc lượt chạy. **Dừng** dùng được cả khi chờ và khi tạm dừng.
+- **Kịch bản đã lưu:** các bước chưa ghi tiêu đề đích dùng cửa sổ đang nhận tiêu điểm khi bắt đầu chạy. Dùng **Chờ cửa sổ** trước nhóm bước cần chạy ở cửa sổ tiếp theo. Tốc độ phát không rút ngắn thời hạn chờ.
+- **Nhật ký phát lại:** `%LOCALAPPDATA%\HocVet\playback_events.jsonl` lưu thời điểm, tên kịch bản, số bước và mã lý do cho các sự kiện tạm dừng, tiếp tục và dừng.
 - **Tiếng Việt:** ghi phím vật lý, bỏ qua phím do bộ gõ tự sinh. Giữ cùng bộ gõ Unicode, Telex/VNI, bố cục bàn phím và Caps Lock khi học / chạy. Kịch bản cũ bị lặp dấu cần học lại.
 - **Mượt hơn:** không dựng lại danh sách cho từng sự kiện nhập; đếm số thao tác theo đợt và giới hạn tần suất cập nhật tiến độ. Kịch bản dài xem/sửa theo trang 12 bước, vẫn giữ đầy đủ mọi thao tác.
 - **Giao diện thống nhất:** màu kem, nút theo vai trò, ô nhập và hộp thoại dùng chung kiểu hiển thị. Trạng thái luôn hiện ở cuối cửa sổ; chia tab và điều chỉnh theo DPI, hỗ trợ Tab / Enter / Space. Hộp chọn file sử dụng giao diện Windows.
@@ -194,7 +198,7 @@ Kiểm thử:
 
 ```powershell
 python test_core.py
-python -m unittest -v test_features test_theme test_workspace test_overlay_input test_his test_date_paste test_single_instance
+python -m unittest -v test_safe_playback test_features test_theme test_workspace test_overlay_input test_his test_date_paste test_single_instance
 ```
 
 Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên qua bảng nổi (cần Microsoft Edge; bài kiểm thử bảng nổi dùng chuột thật trên cửa sổ mẫu rồi trả lại vị trí cũ):
@@ -203,6 +207,12 @@ Kiểm thử tích hợp Edge, cửa sổ Windows mẫu và phát chuột xuyên
 $env:HOCVET_INTEGRATION = '1'
 python -m unittest -v test_workspace.IntegrationTests test_overlay_input.NativePassThroughTests
 ```
+
+Thử tạm dừng bằng hai cửa sổ Notepad dùng dữ liệu giả:
+
+1. Tạo kịch bản gõ một chữ vào cửa sổ A. Chèn **Chờ cửa sổ** với một phần tiêu đề của A và thời hạn 2 giây trước bước gõ. Chạy khi B đang phía trước. Kiểm tra bảng nổi báo bước chờ và hai cửa sổ vẫn trống.
+2. Bấm **Tiếp tục** khi B vẫn phía trước. Bảng phải giữ nguyên số bước. Chọn A rồi bấm **Tiếp tục**. Chỉ A nhận chữ đúng một lần.
+3. Thử lại và bấm **Dừng** trong khi còn chờ. Để thử chờ ảnh, chụp một vùng nhỏ của A có nội dung giả, thay nội dung đó trước lúc chạy rồi khôi phục trước khi bấm **Tiếp tục**. Để thử chuyển cửa sổ, chèn một bước **Chờ cửa sổ** cho B trước nhóm thao tác tiếp theo, rồi đưa B ra trước khi kịch bản tới bước đó.
 
 Kiểm thử học qua giao diện rồi phát lại 5 ngày ở 1× và 10× trên trang HIS giả lập:
 

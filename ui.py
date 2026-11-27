@@ -140,6 +140,7 @@ class Retro3DButton(tk.Canvas):
         self.radius = radius
         self.pressed = False
         self.hovered = False
+        self.focused = False
         self.offset = 0.0
         self.state = "normal"
         self._anim_timer = None
@@ -153,9 +154,14 @@ class Retro3DButton(tk.Canvas):
         self.configure(takefocus=True)
         self.bind('<Return>', self._activate)
         self.bind('<space>', self._activate)
-        self.bind('<FocusIn>', lambda event: self.configure(highlightthickness=2, highlightbackground=BTN_BLUE_TXT))
-        self.bind('<FocusOut>', lambda event: self.configure(highlightthickness=0))
+        self.bind('<FocusIn>', lambda event: self._set_focus(True))
+        self.bind('<FocusOut>', lambda event: self._set_focus(False))
         self._draw()
+
+    def _set_focus(self, focused):
+        if self.focused != focused:
+            self.focused = focused
+            self._draw()
 
     def _resize(self, event):
         if (self.width, self.height) != (event.width, event.height):
@@ -262,6 +268,9 @@ class Retro3DButton(tk.Canvas):
             width=max(20, w-16),
             justify='center',
         )
+        if self.focused and self.state != "disabled":
+            self.create_rectangle(5, 5 + offset, w - 5, h - 9 + offset,
+                                  outline=txt_col, dash=(2, 2))
 
     def _on_press(self, event):
         if self.state == "disabled":
@@ -386,7 +395,7 @@ class HocVetApp:
                 self._shortcut_commands[name] = lambda value=name[6:]: self._set_speed(value + 'x')
         self.manager.on_command = lambda name: self._post(self._dispatch_shortcut, name)
         self.manager.on_record_toggle = lambda: self._post(self._toggle_recording)
-        self.manager.on_panic = lambda: self._post(self._cmd_emergency_stop)
+        self.manager.on_panic = self._request_emergency_stop
         self.manager.on_record_stopped = lambda profile, count: self._post(self._record_saved, profile, count)
         self.manager.recorder.ignore_mouse = lambda x,y:self.record_notice.moving or self._is_own_window(x,y)
         self.manager.recorder.ignore_keyboard = self._is_own_focus
@@ -413,6 +422,9 @@ class HocVetApp:
         self.manager.on_action_recorded = self._on_action_recorded
         self.manager.on_step = self._on_player_step
         self.manager.on_play_finished = lambda success, aborted: self._post(self._on_player_finished, success, aborted)
+        self.manager.on_play_paused = lambda *pause: self._post(self._show_playback_pause, *pause)
+        self.manager.on_play_resumed = lambda: self._post(self._show_playback_resumed)
+        self.record_notice.on_resume = self.manager.resume_playing
         self.manager.on_profile_triggered = self._on_profile_triggered
         self.manager.player.on_wait = lambda text: self._post(self._show_wait, text)
         self.manager.player.on_field_copied=lambda env,field,row:self._post(self._his_field_copied,env,field,row)
@@ -470,7 +482,7 @@ class HocVetApp:
         if hasattr(self, 'workspace'): self.workspace.poll_frame()
         self.record_notice.set_busy(self.manager.state != MacroManager.STATE_IDLE or self.manager.external_busy or self._pending_play is not None)
         self.record_notice.set_environment_enabled(self.his.installed,self.manager.state in (MacroManager.STATE_IDLE,MacroManager.STATE_RECORDING) and not self.manager.external_busy and self._pending_play is None)
-        if self.overlay_input.active and self.manager.state != MacroManager.STATE_PLAYING:
+        if self.overlay_input.active and self.manager.state not in (MacroManager.STATE_PLAYING, MacroManager.STATE_PAUSED):
             self.overlay_input.deactivate()
         now = time.monotonic()
         if self._pending_progress and now-self._last_progress_draw >= .1:
@@ -485,6 +497,7 @@ class HocVetApp:
     def _cleanup_ui(self, event):
         if event.widget is self.root:
             self._closing = True
+            self.manager.player.stop()
             self.date_paste.close()
             self.overlay_input.close()
             self.record_notice.close(force=True)
@@ -526,14 +539,17 @@ class HocVetApp:
         container = tk.Frame(parent, bg=VINTAGE_BG)
         container.pack(fill=tk.BOTH if parent is getattr(self,'details',None) else tk.X, expand=parent is getattr(self,'details',None), padx=16,pady=3)
 
+        title_row = tk.Frame(container, bg=VINTAGE_BG)
+        title_row.pack(anchor="w", padx=2, pady=(2, 3))
+        tk.Frame(title_row, width=4, height=15, bg=BTN_RED_TOP).pack(side=tk.LEFT, padx=(0, 7))
         lbl_sec = tk.Label(
-            container,
+            title_row,
             text=section_name,
             font=("Bahnschrift SemiCondensed", 15),
             bg=VINTAGE_BG,
             fg=VINTAGE_TEXT_HEAD,
         )
-        lbl_sec.pack(anchor="w", padx=4, pady=(1, 2))
+        lbl_sec.pack(side=tk.LEFT)
 
         card = tk.Frame(
             container,
@@ -541,16 +557,17 @@ class HocVetApp:
             highlightbackground=VINTAGE_CARD_BORDER,
             highlightthickness=2,
             padx=12,
-            pady=5,
+            pady=6,
         )
         card.pack(fill=tk.BOTH, expand=True)
-        tk.Frame(container, height=3, bg='#b8b0a0').pack(fill=tk.X, padx=(2, 0))
+        tk.Frame(container, height=2, bg='#b8b0a0').pack(fill=tk.X, padx=(1, 1))
         return card
 
     def _build_ui(self):
         self.status_banner = tk.Label(self.root, text='SẴN SÀNG', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                                       font=('Segoe UI', 10, 'bold'), pady=8, wraplength=700)
         self.status_banner.pack(side=tk.BOTTOM, fill=tk.X)
+        tk.Frame(self.root, height=1, bg=VINTAGE_CARD_BORDER).pack(side=tk.BOTTOM, fill=tk.X)
         self.tabs = ttk.Notebook(self.root)
         self.tabs.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 0))
         self.content = tk.Frame(self.tabs, bg=VINTAGE_BG)
@@ -562,7 +579,7 @@ class HocVetApp:
                              (self.settings_tab, 'Cài đặt'), (self.extensions_tab, 'Tính năng mở rộng'),
                              (self.exit_tab, 'Thoát toàn bộ')):
             self.tabs.add(frame, text=label)
-        pad_x, pad_y = round(10 * self.dpi_scale), round(3 * self.dpi_scale)
+        pad_x, pad_y = round(10 * self.dpi_scale), max(1, round(1 * self.dpi_scale))
         font = ImageFont.truetype('segoeuib.ttf', max(10, round(self.root.winfo_fpixels('9p'))))
         bounds = font.getbbox('✕ Thoát')
         w = bounds[2] - bounds[0] + pad_x * 2
@@ -588,15 +605,18 @@ class HocVetApp:
         header.pack(fill=tk.X)
         tk.Label(header, text='HỌC VẸT', bg=VINTAGE_BG, fg=VINTAGE_TEXT_HEAD,
                  font=('Bahnschrift SemiCondensed', 22, 'bold')).pack(side=tk.LEFT)
-        tk.Label(header, text=f'v{APP_VERSION}', bg=VINTAGE_BG, fg=VINTAGE_TEXT_MUTED, font=FONT_BODY).pack(side=tk.LEFT, padx=10)
+        tk.Label(header, text=f'v{APP_VERSION}', bg=VINTAGE_INNER_GROOVE, fg=VINTAGE_TEXT_BODY,
+                 font=('Segoe UI', 8, 'bold'), padx=7, pady=2,
+                 highlightbackground=VINTAGE_CARD_BORDER, highlightthickness=1).pack(side=tk.LEFT, padx=10)
         Retro3DButton(header, text='Hướng dẫn', width=88, height=32, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_help).pack(side=tk.RIGHT)
         Retro3DButton(header, text='Cài đặt', width=88, height=32, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._cmd_open_settings).pack(side=tk.RIGHT, padx=6)
         Retro3DButton(header, text='Thu vào khay', width=105, height=32, top_color=BTN_BEIGE_TOP,
                       bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._hide_to_tray).pack(side=tk.RIGHT, padx=6)
-        Retro3DButton(header, text='Bảng điều khiển', width=125, height=32, top_color=BTN_BEIGE_TOP,
-                      bot_color=BTN_BEIGE_BOT, text_color=BTN_BEIGE_TXT, command=self._toggle_controls).pack(side=tk.RIGHT)
+        Retro3DButton(header, text='Bảng điều khiển', width=125, height=32, top_color=BTN_BLUE_TOP,
+                      bot_color=BTN_BLUE_BOT, text_color=BTN_BLUE_TXT, command=self._toggle_controls).pack(side=tk.RIGHT)
+        tk.Frame(self.content, height=1, bg=VINTAGE_CARD_BORDER).pack(fill=tk.X, padx=20, pady=(0, 4))
         select = self._create_section_card(self.content, '01  CHỌN KỊCH BẢN')
         choice_row = tk.Frame(select, bg=VINTAGE_CARD_BG)
         choice_row.pack(fill=tk.X)
@@ -673,6 +693,8 @@ class HocVetApp:
             ttk.Button(tools, text=label, command=command).pack(side=tk.LEFT, padx=(0, 4))
         self.tree = ttk.Treeview(detail_card, columns=('stt', 'delay', 'type', 'detail'), show='headings',
                                  selectmode='browse', height=12, style='RetroHardware.Treeview')
+        self.tree.tag_configure('odd', background='#fffdf8')
+        self.tree.tag_configure('even', background='#f4efe2')
         for name, label, width in (('stt', '#', 44), ('delay', 'Chờ', 66), ('type', 'Thao tác', 130), ('detail', 'Chi tiết', 300)):
             self.tree.heading(name, text=label)
             self.tree.column(name, width=width, minwidth=40, stretch=name=='detail')
@@ -727,7 +749,8 @@ class HocVetApp:
     # THÔNG BÁO ỨNG DỤNG
     # ==========================================
     def notify_app(self, title: str, message: str, progress=None):
-        self.record_notice.show(title, message, duration=None if progress is not None else 4000, progress=progress)
+        if not self.record_notice.paused:
+            self.record_notice.show(title, message, duration=None if progress is not None else 4000, progress=progress)
 
     # ==========================================
     # QUẢN LÝ KHAY HỆ THỐNG (SYSTEM TRAY)
@@ -744,7 +767,7 @@ class HocVetApp:
             self._post(self._toggle_controls)
 
         def _action_panic(icon, item):
-            if self.manager.script_activation=='mouse': self._post(self._cmd_emergency_stop)
+            if self.manager.script_activation=='mouse': self._request_emergency_stop()
 
         def _action_exit(icon, item):
             self._post(self._exit_app)
@@ -800,11 +823,15 @@ class HocVetApp:
         if not route.active:return
         win=notice.window
         if not win or not win.winfo_ismapped():
-            route.bounds=route.stop_bounds=route.close_bounds=route.drag_bounds=(0,0,0,0);return
+            route.bounds=route.stop_bounds=route.resume_bounds=route.close_bounds=route.drag_bounds=(0,0,0,0);return
         win.update_idletasks()
         def bounds(widget):
             return (widget.winfo_rootx(),widget.winfo_rooty(),widget.winfo_rootx()+widget.winfo_width(),widget.winfo_rooty()+widget.winfo_height())
-        route.bounds=bounds(win);route.stop_bounds=bounds(notice.stop_button)
+        route.bounds = bounds(win)
+        route.stop_bounds = bounds(notice.pause_stop_button if notice.paused else notice.stop_button)
+        route.allow_stop = notice.paused or self.manager.script_activation == 'mouse'
+        route.resume_bounds = bounds(notice.resume_button) if notice.paused else (0, 0, 0, 0)
+        route.on_resume = lambda: self._post(self.manager.resume_playing)
         route.close_bounds=bounds(notice.hide_button);route.drag_bounds=bounds(notice.title)
         route.on_hide=lambda:self._post(self._hide_controls)
         route.on_drag_start=lambda x,y:self._post(notice.start_drag_at,x,y)
@@ -1087,7 +1114,7 @@ class HocVetApp:
         ttk.Label(panel, text='Gõ tên phím (F6, Ctrl+Shift+K) hoặc bấm Ghi phím rồi nhấn tổ hợp.', wraplength=650).pack(anchor='w')
         ttk.Label(panel, text='Ở chế độ phím, các lệnh hoạt động theo phạm vi đã chọn. Chế độ chuột vô hiệu hóa toàn bộ phím đã gán, kể cả Dừng khẩn cấp.', wraplength=650).pack(anchor='w', pady=(4, 8))
         rows = ttk.Frame(panel)
-        rows.pack(fill=tk.BOTH, expand=True)
+        rows.pack(fill=tk.X, expand=False, pady=(2, 4))
         self._settings_widgets = []
         variables = {name: tk.StringVar(value=value) for name, value in self.manager.shortcut_values().items()}
         scopes = {name: tk.StringVar(value='Toàn cục' if value == 'global' else 'Trong ứng dụng')
@@ -1600,7 +1627,7 @@ class HocVetApp:
             stop_bounds = (stop.winfo_rootx(),stop.winfo_rooty(),stop.winfo_rootx()+stop.winfo_width(),stop.winfo_rooty()+stop.winfo_height())
             try:
                 self.overlay_input.activate(self.record_notice.hwnd, bounds, stop_bounds,
-                    lambda:self._post(self._cmd_emergency_stop), self.manager.script_activation=='mouse')
+                    self._request_emergency_stop, self.manager.script_activation=='mouse')
             except Exception as error:
                 self.notify_app('Chưa thể chạy', str(error))
                 return
@@ -1619,6 +1646,10 @@ class HocVetApp:
         if not profile or not profile.enabled or not profile.actions: return
         self._select_profile(profile.id)
         self._cmd_start_playing(from_hotkey=from_hotkey)
+
+    def _request_emergency_stop(self):
+        self.manager.player.stop()
+        self._post(self._cmd_emergency_stop)
 
     def _cmd_emergency_stop(self):
         if self._pending_play is not None:
@@ -1647,7 +1678,10 @@ class HocVetApp:
         self._post(self._run_from_panel, profile.id, True)
 
     def _handle_state_ui(self, state: str):
-        if self.his_panel and state==MacroManager.STATE_PLAYING:self.his_panel.reset_progress()
+        previous = getattr(self, '_rendered_state', None)
+        self._rendered_state = state
+        if self.his_panel and state == MacroManager.STATE_PLAYING and previous != MacroManager.STATE_PAUSED:
+            self.his_panel.reset_progress()
         if self.his_panel:self.his_panel.sync_state()
         idle = state == MacroManager.STATE_IDLE and not self.manager.external_busy
         self.profile_choice.configure(state='readonly' if idle else 'disabled')
@@ -1659,6 +1693,7 @@ class HocVetApp:
         self.status_banner.configure(bg={MacroManager.STATE_IDLE: '#e2f4e5',
                                          MacroManager.STATE_RECORDING: '#ffe3e3',
                                          MacroManager.STATE_PLAYING: '#dfeeff',
+                                         MacroManager.STATE_PAUSED: '#f3e5bf',
                                          MacroManager.STATE_COUNTDOWN: '#f3e5bf'}[state])
         if state == MacroManager.STATE_IDLE:
             self._set_hud(
@@ -1691,6 +1726,10 @@ class HocVetApp:
             self.btn_rec.configure_state("disabled")
             self.btn_stop.configure_state("disabled")
             self.btn_play.configure_state("disabled")
+        elif state == MacroManager.STATE_PAUSED:
+            self.btn_rec.configure_state('disabled')
+            self.btn_play.configure_state('disabled')
+            self.btn_stop.configure_state('disabled')
         if self.manager.script_activation == 'hotkey':
             for button in (self.btn_rec,self.btn_play,self.btn_stop,self.btn_panic):
                 button.configure_state('disabled')
@@ -1701,6 +1740,19 @@ class HocVetApp:
 
     def _on_player_step(self, step: int, total: int, cur_loop: int, total_loops: int):
         self._pending_progress = (step, total, cur_loop, total_loops)
+
+    def _show_playback_pause(self, name, step, total, reason):
+        self._pending_progress = None
+        details = f'{name}\nBước {step}/{total} · {reason}'
+        self._set_hud(f'ĐANG TẠM DỪNG · {details}', BTN_YELLOW_TXT)
+        self.record_notice.paused = True
+        self.record_notice.hidden = False
+        self.record_notice.show('ĐANG TẠM DỪNG', details)
+
+    def _show_playback_resumed(self):
+        self.record_notice.paused = False
+        self.notify_app('Đang chạy kịch bản', f'{self.manager.player.script_name} · Đã tiếp tục.',
+                        progress=self.record_notice.progress['value'])
 
     def _his_field_copied(self,environment_id,field_id,row):
         if self.his_panel:self.his_panel.mark_copied(environment_id,field_id,row)
@@ -1720,6 +1772,7 @@ class HocVetApp:
 
     def _on_player_finished(self, success: bool, aborted: bool):
         self._pending_progress = None
+        self.record_notice.paused = False
         if self.his_panel:self.his_panel.finish_progress(success and not aborted)
         active = self.manager.get_active_profile()
         p_name = active.name if active else ""
@@ -1798,7 +1851,8 @@ class HocVetApp:
         self.next_page.configure(state='normal' if end < len(active.actions) else 'disabled')
         for index in range(start, end):
             t_name, detail, delay_str = self._format_action_display(active.actions[index])
-            self.tree.insert('', tk.END, iid=str(index), values=(f'{index+1:02d}', delay_str, t_name, detail))
+            tag = 'even' if (index - start) % 2 else 'odd'
+            self.tree.insert('', tk.END, iid=str(index), values=(f'{index+1:02d}', delay_str, t_name, detail), tags=(tag,))
         self._update_stats()
 
     def _update_stats(self):
@@ -1977,7 +2031,7 @@ Kịch bản có thể chứa thông tin đã gõ và ảnh chụp màn hình; k
         index = int(selected[0]) if selected else len(active.actions)
         win = self._new_dialog(
             'Chờ cửa sổ phía trước' if kind == 'wait_window' else 'Chờ ảnh / nút xuất hiện',
-            'Chèn trước bước đã chọn. Hết thời hạn sẽ dừng kịch bản.', size=(720, 450))
+            'Chèn trước bước đã chọn. Hết thời hạn sẽ tạm dừng tại bước chờ.', size=(720, 450))
         box = win.body
         title = tk.StringVar(value=existing.window_title if existing else '')
         timeout = tk.StringVar(value=str(existing.timeout if existing else 30))

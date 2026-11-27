@@ -64,6 +64,18 @@ class InputFilterTests(unittest.TestCase):
         self.route.on_stop.assert_not_called()
         self.assertTrue(self.route._filter(0x201,self.data(x=500,y=500)))
 
+    def test_only_physical_click_can_resume_and_release_is_swallowed(self):
+        self.route.resume_bounds = (20, 240, 90, 290)
+        self.route.on_resume = Mock()
+        self.assertTrue(self.route._filter(0x201, self.data(x=40, flags=1)))
+        self.route.on_resume.assert_not_called()
+        with self.assertRaises(Suppressed):
+            self.route._filter(0x201, self.data(x=40))
+        with self.assertRaises(Suppressed):
+            self.route._filter(0x202, self.data(x=40))
+        self.route.on_resume.assert_called_once()
+        self.route.on_stop.assert_not_called()
+
     def test_marker_acknowledges_queue_and_styles_are_restored(self):
         self.route.user=Mock()
         self.route.user.GetWindowLongPtrW.return_value=0x8000080
@@ -78,6 +90,80 @@ class InputFilterTests(unittest.TestCase):
 
 @unittest.skipUnless(os.getenv('HOCVET_INTEGRATION')=='1','Chỉ chạy trên cửa sổ kiểm thử cục bộ')
 class NativePassThroughTests(unittest.TestCase):
+    def test_real_foreground_switch_blocks_keyboard_until_target_is_restored(self):
+        import tkinter as tk
+        from threading import Event
+        from conditions import foreground_window, window_at
+        from core import MacroAction, MacroPlayer
+
+        root = tk.Tk()
+        root.title('Học Vẹt kiểm thử A')
+        root.geometry('280x120+40+60')
+        other = tk.Toplevel(root)
+        other.title('Học Vẹt kiểm thử B')
+        other.geometry('280x120+350+60')
+        received = []
+        entries = []
+        for window, label in ((root, 'A'), (other, 'B')):
+            entry = tk.Entry(window)
+            entry.pack(padx=20, pady=20)
+            entry.bind('<F2>', lambda event, dest=label: received.append(dest))
+            entries.append(entry)
+        root.update()
+        handles = [window_at(entry.winfo_rootx() + 5, entry.winfo_rooty() + 5) for entry in entries]
+        before_step, allow_step = Event(), Event()
+        paused = Event()
+        player = MacroPlayer()
+        player.protect_keyboard = lambda: foreground_window() not in handles
+        player.on_paused = lambda *_: paused.set()
+
+        def advance_to_input(step, *_):
+            if step == 1:
+                before_step.set()
+                allow_step.wait(3)
+
+        def focus(index):
+            entries[index].focus_force()
+            root.update()
+            self.assertTrue(handles[index])
+            self.assertEqual(foreground_window(), handles[index])
+
+        def pump_until(condition):
+            deadline = time.monotonic() + 3
+            while not condition() and time.monotonic() < deadline:
+                root.update()
+                time.sleep(.005)
+            root.update()
+            self.assertTrue(condition())
+
+        player.on_step = advance_to_input
+        try:
+            focus(0)
+            with patch('core.play_sound'):
+                player.play_async([MacroAction('key_press', 0, key='Key.f2'),
+                                   MacroAction('key_release', 0, key='Key.f2')])
+                pump_until(before_step.is_set)
+                focus(1)
+                allow_step.set()
+                pump_until(paused.is_set)
+                self.assertEqual(received, [])
+                self.assertIn('mất tiêu điểm', player.pause[-1])
+                paused.clear()
+                player.resume()
+                pump_until(paused.is_set)
+                self.assertEqual(received, [])
+                focus(0)
+                player.resume()
+                pump_until(lambda: not player.is_playing)
+                pump_until(lambda: bool(received))
+            self.assertEqual(received, ['A'])
+        finally:
+            player.stop()
+            allow_step.set()
+            if player._play_thread:
+                player._play_thread.join(3)
+            root.destroy()
+
     def test_real_playback_reaches_window_under_panel_without_pressing_panel(self):
         import ctypes
         from ctypes import wintypes
@@ -86,7 +172,8 @@ class NativePassThroughTests(unittest.TestCase):
         from core import MacroPlayer,MacroAction,ScriptProfile
         from record_notice import RecordNotice
         from ui_theme import apply_theme
-        root=tk.Tk();root.withdraw();apply_theme(root,root.winfo_fpixels('1i')/96)
+        root=tk.Tk();root.title('Học Vẹt kiểm thử bảng');root.geometry('240x100+16+16')
+        apply_theme(root,root.winfo_fpixels('1i')/96)
         notice=RecordNotice(root);route=OverlayInput();controller=mouse.Controller()
         original_position=controller.position
         under=None
@@ -97,13 +184,14 @@ class NativePassThroughTests(unittest.TestCase):
             notice.set_busy(True);root.update()
             win=notice.window
             x,y,w,h=win.winfo_rootx(),win.winfo_rooty(),win.winfo_width(),win.winfo_height()
-            under=tk.Toplevel(root);under.overrideredirect(True);under.attributes('-topmost',True)
+            under=tk.Toplevel(root);under.title('Cửa sổ thử phát xuyên bảng');under.attributes('-topmost',True)
             under.geometry(f'{w}x{h}+{x}+{y}')
             canvas=tk.Canvas(under,bg='#bbddbb',highlightthickness=0);canvas.pack(fill='both',expand=True)
             clicks=[];wheels=[]
             canvas.bind('<Button-1>',lambda e:clicks.append((e.x_root,e.y_root)))
             canvas.bind('<MouseWheel>',lambda e:wheels.append(e.delta))
-            root.update();win.lift();root.update()
+            root.update();canvas.focus_force();root.update()
+            notice.show('Đang phát qua bảng', 'Cửa sổ kiểm thử', progress=0)
             button=notice.stop_button
             bx,by=button.winfo_rootx(),button.winfo_rooty()
             bw,bh=button.winfo_width(),button.winfo_height()
@@ -120,13 +208,16 @@ class NativePassThroughTests(unittest.TestCase):
             target=user.WindowFromPoint(wintypes.POINT(px,py))
             user.GetAncestor.argtypes=[wintypes.HWND,wintypes.UINT];user.GetAncestor.restype=wintypes.HWND
             self.assertEqual(user.GetAncestor(target,2),user.GetAncestor(under.winfo_id(),2),'Không gửi chuột nếu bên dưới không phải cửa sổ kiểm thử')
+            from conditions import foreground_window
+            self.assertEqual(foreground_window(),user.GetAncestor(under.winfo_id(),2))
             actions=[]
             for _ in range(5):
                 actions += [MacroAction('mouse_click',.1,x=px,y=py,button='left',pressed=True),
                             MacroAction('mouse_click',.1,x=px,y=py,button='left',pressed=False)]
             actions.append(MacroAction('mouse_scroll',.1,x=px,y=py,dy=-1))
             player=MacroPlayer();player.on_input_finished=route.drain
-            player.protect_mouse=lambda xx,yy:user.GetAncestor(user.WindowFromPoint(wintypes.POINT(xx,yy)),2)==notice.hwnd
+            target_root=user.GetAncestor(under.winfo_id(),2)
+            player.protect_mouse=lambda xx,yy:user.GetAncestor(user.WindowFromPoint(wintypes.POINT(xx,yy)),2)!=target_root
             import queue
             progress=queue.Queue()
             player.on_step=lambda step,total,*_:progress.put((step,total))
@@ -139,7 +230,7 @@ class NativePassThroughTests(unittest.TestCase):
                         step,total=progress.get_nowait()
                         notice.show('Đang phát qua bảng',f'Bước {step}/{total}',progress=step/total*100)
                     root.update();time.sleep(.005)
-                self.assertFalse(player.is_playing)
+                self.assertFalse(player.is_playing, f'{player.pause}; {player.last_error}')
             root.update()
             self.assertEqual(finished,[(True,False)],f'{player.last_error}; events={events[-20:]}')
             self.assertEqual(len(clicks),5)

@@ -84,8 +84,17 @@ def apply_theme(root, scale):
     style.configure('TCheckbutton', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY,
                     padding=round(4 * scale))
     style.map('TCheckbutton', background=[('active', VINTAGE_CARD_BG)])
+    style.configure('TRadiobutton', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_BODY,
+                    padding=round(4 * scale))
+    style.map('TRadiobutton', background=[('active', VINTAGE_CARD_BG)])
+    style.configure('TLabelframe', background=VINTAGE_CARD_BG, bordercolor=VINTAGE_CARD_BORDER,
+                    lightcolor=VINTAGE_CARD_BORDER, darkcolor=VINTAGE_CARD_BORDER, relief='solid', borderwidth=1)
+    style.configure('TLabelframe.Label', background=VINTAGE_CARD_BG, foreground=VINTAGE_TEXT_HEAD, font=FONT_TITLE)
     style.configure('TEntry', fieldbackground='#fffdf8', padding=round(5 * scale),
                     bordercolor=VINTAGE_CARD_BORDER, lightcolor=VINTAGE_CARD_BORDER)
+    style.configure('TSpinbox', fieldbackground='#fffdf8', background=BTN_BEIGE_TOP,
+                    arrowcolor=VINTAGE_TEXT_HEAD, bordercolor=VINTAGE_CARD_BORDER,
+                    lightcolor=VINTAGE_CARD_BORDER, padding=round(4 * scale))
     style.configure('TCombobox', fieldbackground='#fffdf8', background=BTN_BEIGE_TOP,
                     arrowcolor=VINTAGE_TEXT_HEAD, padding=round(4 * scale))
     style.map('TCombobox', fieldbackground=[('readonly', '#fffdf8')],
@@ -101,6 +110,11 @@ def apply_theme(root, scale):
                         font=FONT_BTN, padding=(round(10*scale), round(6*scale)), focusthickness=2)
         style.map(name, background=[('disabled', VINTAGE_INNER_GROOVE), ('pressed', bottom), ('active', adjust_color(top, 1.08))],
                   foreground=[('disabled', VINTAGE_TEXT_MUTED)], relief=[('pressed', 'sunken')])
+    style.configure('Readout.TButton', background='#fffdf8', foreground=VINTAGE_TEXT_HEAD,
+                    bordercolor=VINTAGE_CARD_BORDER, lightcolor=VINTAGE_CARD_BORDER, darkcolor=VINTAGE_CARD_BORDER,
+                    relief='solid', borderwidth=1, font=FONT_TITLE, padding=(round(6*scale), round(5*scale)))
+    style.map('Readout.TButton', background=[('disabled', VINTAGE_INNER_GROOVE), ('active', '#fffdf8'), ('pressed', '#fffdf8')],
+              foreground=[('disabled', VINTAGE_TEXT_MUTED)], relief=[('pressed', 'solid')])
     style.configure('TSeparator', background=VINTAGE_CARD_BORDER)
     style.configure('TScrollbar', background=BTN_RED_TOP, troughcolor=VINTAGE_INNER_GROOVE,
                     arrowcolor=VINTAGE_TEXT_HEAD, bordercolor=VINTAGE_CARD_BORDER)
@@ -139,8 +153,10 @@ def create_dialog(parent, title, subtitle='', size=(640, 420), modal=True):
                  if event.widget is win else None, add='+')
     win.footer = ttk.Frame(win, padding=(16, 8, 16, 12))
     win.footer.pack(side=tk.BOTTOM, fill=tk.X)
-    win.body = ttk.Frame(win, padding=16, relief='solid', borderwidth=1)
-    win.body.pack(fill=tk.BOTH, expand=True, padx=14, pady=(0, 4))
+    body_wrap = tk.Frame(win, bg=VINTAGE_CARD_BORDER, padx=1, pady=1)
+    body_wrap.pack(fill=tk.BOTH, expand=True, padx=14, pady=(0, 4))
+    win.body = ttk.Frame(body_wrap, padding=16)
+    win.body.pack(fill=tk.BOTH, expand=True)
     if modal:
         win.grab_set()
     return win

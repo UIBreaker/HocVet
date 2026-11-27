@@ -199,7 +199,8 @@ class FeaturesTest(unittest.TestCase):
         player.on_finished = Mock()
         player.on_wait = Mock()
         check = Mock(side_effect=[False, True])
-        with patch('core.condition_check', return_value=check), patch('core.play_sound'):
+        with patch('core.condition_check', return_value=check), patch('core.play_sound'), \
+                patch('core.foreground_window', return_value=123):
             player._run_playback(actions, 1, 1, 0)
         self.assertEqual(check.call_count, 2)
         player.keyboard_controller.press.assert_called_once()
@@ -209,11 +210,18 @@ class FeaturesTest(unittest.TestCase):
     def test_timeout_does_not_execute_following_action(self):
         player = self.player()
         player.on_finished = Mock()
+        pauses = []
+        def stop_on_pause(*info):
+            pauses.append(info)
+            player.stop()
+        player.on_paused = stop_on_pause
         actions = [MacroAction('wait_window', 0, window_title='HIS', timeout=.01),
                    MacroAction('key_press', 0, key='vk_65')]
-        with patch('core.condition_check', return_value=lambda: False), patch('core.play_sound'):
-            player._run_playback(actions, 10, 1, 0)
-        self.assertIn('Hết', player.last_error)
+        with patch('core.condition_check', return_value=lambda *_: False), patch('core.play_sound'):
+            player.play_async(actions, speed=10)
+            player._play_thread.join(2)
+        self.assertFalse(player.is_playing)
+        self.assertIn('Không tìm thấy', pauses[0][-1])
         player.keyboard_controller.press.assert_not_called()
         player.on_finished.assert_called_once_with(False, True)
 
@@ -221,7 +229,7 @@ class FeaturesTest(unittest.TestCase):
         player = self.player()
         player.on_finished = Mock()
         action = MacroAction('wait_window', 0, window_title='HIS', timeout=30)
-        with patch('core.condition_check', return_value=lambda: False), patch('core.play_sound'):
+        with patch('core.condition_check', return_value=lambda *_: False), patch('core.play_sound'):
             player.is_playing = True
             thread = threading.Thread(target=player._run_playback, args=([action], 1, 1, 0))
             thread.start()
@@ -494,6 +502,40 @@ class UITest(unittest.TestCase):
             while time.monotonic()<until: self.root.update(); time.sleep(.01)
             play.assert_called_once_with(self.profile)
             self.assertEqual(self.root.state(), 'withdrawn')
+
+    def test_paused_panel_shows_step_and_keeps_stop_and_resume_in_hotkey_mode(self):
+        self.profile.actions = [MacroAction('wait_window', 0, window_title='Mẫu thử không tồn tại', timeout=.05)]
+        self.app.manager.player.on_input_finished = Mock()
+        with patch.object(self.app.overlay_input, 'activate', side_effect=lambda *_: setattr(self.app.overlay_input, 'active', True)):
+            self.app._cmd_start_playing(from_hotkey=True)
+            deadline = time.monotonic() + 3
+            notice = self.app.record_notice
+            while not notice.paused and time.monotonic() < deadline:
+                self.root.update()
+                time.sleep(.01)
+            self.assertTrue(notice.paused)
+            self.assertEqual(notice.title.cget('text'), 'ĐANG TẠM DỪNG')
+            for text in (self.profile.name, 'Bước 1/1', 'Không tìm thấy'):
+                self.assertIn(text, notice.message.cget('text'))
+            route = self.app.overlay_input
+            self.assertTrue(route.allow_stop)
+            for button, bounds in ((notice.resume_button, route.resume_bounds),
+                                   (notice.pause_stop_button, route.stop_bounds)):
+                self.assertTrue(button.winfo_ismapped())
+                self.assertEqual(button.winfo_rooty(), bounds[1])
+                self.assertLessEqual(bounds[3], notice.window.winfo_rooty() + notice.window.winfo_height())
+            notice.resume_button.invoke()
+            deadline = time.monotonic() + 2
+            while 'Vẫn chưa tìm thấy' not in notice.message.cget('text') and time.monotonic() < deadline:
+                self.root.update()
+                time.sleep(.01)
+            self.assertIn('Vẫn chưa tìm thấy', notice.message.cget('text'))
+            notice.pause_stop_button.invoke()
+            self.app.manager.player._play_thread.join(2)
+            self.app._process_ui_events()
+            self.assertFalse(notice.paused)
+            self.assertFalse(route.active)
+            self.assertTrue(notice.launcher.winfo_ismapped())
 
     def test_settings_activation_saves_and_rebuilds_listeners(self):
         from tkinter import ttk

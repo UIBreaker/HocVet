@@ -1,3 +1,19 @@
+# Học Vẹt v0.23.2
+
+- Phát lại tự tạm dừng khi sai cửa sổ, mất tiêu điểm hoặc hết thời hạn chờ ảnh hay cửa sổ. Bảng nổi hiển thị tên kịch bản, số bước và lý do, kèm nút **Tiếp tục** và **Dừng**.
+- Khi tiếp tục, ứng dụng kiểm tra lại bước đang vướng. Nếu kết quả một thao tác đã gửi chưa rõ, ứng dụng kết thúc lượt chạy sau khi bạn xác nhận để tránh lặp thao tác.
+- Nhật ký tại `%LOCALAPPDATA%\HocVet\playback_events.jsonl` ghi thời điểm, tên kịch bản, số bước và mã lý do.
+
+## Nâng cấp và tải về
+
+Đóng phiên bản đang chạy rồi thay EXE hoặc giải nén ZIP mới. Dữ liệu và cài đặt nằm tại `%LOCALAPPDATA%\HocVet`.
+
+- [Tải HocVet.exe cho Windows](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/HocVet.exe)
+- [Tải gói ZIP v0.23.2](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/HocVet-v0.23.2-Windows.zip)
+- [Mã kiểm tra SHA-256](https://github.com/UIBreaker/HocVet/releases/download/v0.23.2/SHA256SUMS.txt)
+
+---
+
 # Học Vẹt v0.22.1
 
 - Tinh chỉnh hiệu ứng mượt mà và nút bấm micro-animation phản hồi xúc giác cơ học (có thể bật/tắt trong Cài đặt `animations_enabled`), tối ưu khởi động ứng dụng nhanh tức thì thông qua nạp lười mô-đun.

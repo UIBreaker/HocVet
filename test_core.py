@@ -219,6 +219,7 @@ def test_macro_manager_state_machine():
     print("-> Kiểm tra máy trạng thái MacroManager (State Machine)...")
     from core import MacroManager
     mgr = MacroManager(library_path="test_temp_library.json")
+    mgr.player.log_path = None
     mgr.player.keyboard_controller = Mock()
     mgr.player.mouse_controller = Mock()
     assert mgr.state == MacroManager.STATE_IDLE

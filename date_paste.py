@@ -19,21 +19,23 @@ def date_parts(value):
     return f'{day:02}',f'{month:02}',f'{year:04}'
 
 
-def paste_date(value,controller,cancel,protect=None,target=None,navigation='tab'):
+def paste_date(value,controller,cancel,protect=None,target=None,navigation='tab',*,send=None):
     if navigation not in ('tab','auto'):raise ValueError('Kiểu chuyển ô ngày không hợp lệ.')
     parts=date_parts(value)
     user=ctypes.windll.user32
     if target is None:target=user.GetForegroundWindow()
+    if send is None:
+        def send(method,key):method(key)
     def check():
         if cancel.is_set():raise InterruptedError('Đã dừng dán ngày.')
-        if user.GetForegroundWindow()!=target or protect and protect():
+        if protect and protect() or user.GetForegroundWindow()!=target:
             raise RuntimeError('Cửa sổ nhận dữ liệu đã thay đổi. Hãy chọn lại ô ngày rồi thử lại.')
     def chord(char):
-        controller.press(keyboard.Key.ctrl_l)
+        send(controller.press,keyboard.Key.ctrl_l)
         try:
             key=keyboard.KeyCode.from_vk(ord(char.upper()))
-            controller.press(key);controller.release(key)
-        finally:controller.release(keyboard.Key.ctrl_l)
+            send(controller.press,key);send(controller.release,key)
+        finally:send(controller.release,keyboard.Key.ctrl_l)
     focus=None
     try:
         # Ở 10×, cú bấm ô ngày có thể còn trong hàng đợi của cửa sổ đích.
@@ -61,7 +63,7 @@ def paste_date(value,controller,cancel,protect=None,target=None,navigation='tab'
                     if cancel.wait(.05):check()
                     check();moved=not focus.same(before,focus.current())
                 if not moved:
-                    controller.press(keyboard.Key.tab);controller.release(keyboard.Key.tab)
+                    send(controller.press,keyboard.Key.tab);send(controller.release,keyboard.Key.tab)
                     if cancel.wait(.08):check()
     finally:
         if focus:focus.close()

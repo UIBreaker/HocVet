@@ -16,15 +16,23 @@ class RetroSlider(tk.Canvas):
         self.command = command
         self.on_preview = on_preview
         self._anim_timer = None
+        self.hovered = False
         self.bind('<Configure>', lambda event: self._draw())
         self.bind('<Button-1>', self._drag)
         self.bind('<B1-Motion>', self._drag)
         self.bind('<ButtonRelease-1>', lambda event: self.command(self.values[self.index]))
+        self.bind('<Enter>', lambda event: self._set_hover(True))
+        self.bind('<Leave>', lambda event: self._set_hover(False))
         self.bind('<Left>', lambda event: self._step(-1))
         self.bind('<Right>', lambda event: self._step(1))
         self.bind('<FocusIn>', lambda event: self._draw())
         self.bind('<FocusOut>', lambda event: self._draw())
         self.bind('<Destroy>', lambda event: self._cancel_anim(), add='+')
+
+    def _set_hover(self, hovered):
+        if self.hovered != hovered:
+            self.hovered = hovered
+            self._draw()
 
     def _cancel_anim(self):
         if self._anim_timer:
@@ -96,18 +104,21 @@ class RetroSlider(tk.Canvas):
         self.create_line(24, 20, right, 20, width=12, fill='#c3bbac', capstyle='round')
         self.create_line(24, 19, right, 19, width=8, fill='#fffdf7', capstyle='round')
         self.create_line(24, 17, right, 17, width=1, fill='#9e978a')
+        x = 24 + (right-24)*self.position/max(1, len(self.values)-1)
+        if x > 26:
+            self.create_line(24, 19, x, 19, width=6, fill='#de7b6f', capstyle='round')
         for index, value in enumerate(self.values):
             tick_x = 24 + (right-24)*index/max(1, len(self.values)-1)
-            selected = index == self.position
-            self.create_line(tick_x, 31, tick_x, 35, fill=BTN_RED_BOT if selected else VINTAGE_TEXT_MUTED)
+            selected = index == self.index
+            self.create_line(tick_x, 30, tick_x, 35, width=2 if selected else 1,
+                             fill=BTN_RED_BOT if selected else VINTAGE_TEXT_MUTED)
             self.create_text(tick_x, 46, text=f'{value:g}×', tags=('speed_tick_label',),
                              fill=BTN_RED_BOT if selected else '#585249',
                              font=('Segoe UI', 10, 'bold' if selected else 'normal'))
-        x = 24 + (right-24)*self.position/max(1, len(self.values)-1)
         self.create_oval(x-9, 12, x+9, 30, fill='#bab1a3', outline='')
         self.create_oval(x-8, 9, x+8, 25, fill=BTN_RED_BOT, outline='#a74b41', tags=('speed_thumb',))
-        self.create_oval(x-7, 9, x+7, 22, fill=BTN_RED_TOP, outline='')
-        self.create_line(x-3, 12, x+3, 12, fill='#f5a39a', width=2)
+        self.create_oval(x-7, 9, x+7, 22, fill='#e06e62' if self.hovered else BTN_RED_TOP, outline='')
+        self.create_line(x-3, 12, x+3, 12, fill='#f7b5ad' if self.hovered else '#f5a39a', width=2)
         if self.focus_get() is self:
             self.create_rectangle(2, 2, max(10, self.winfo_width()-2), int(self.cget('height'))-3,
                                   outline=VINTAGE_TEXT_MUTED, dash=(2, 2))

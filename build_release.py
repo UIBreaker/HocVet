@@ -56,7 +56,7 @@ if __name__ == '__main__':
     project = Path(__file__).resolve().parent
     for command in (
             [sys.executable, '-X', 'utf8', 'test_core.py'],
-            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_features', 'test_theme', 'test_workspace', 'test_overlay_input', 'test_his', 'test_date_paste', 'test_single_instance'],
+            [sys.executable, '-X', 'utf8', '-m', 'unittest', '-v', 'test_safe_playback', 'test_features', 'test_theme', 'test_workspace', 'test_overlay_input', 'test_his', 'test_date_paste', 'test_single_instance'],
             [sys.executable, '-m', 'PyInstaller', '--noconfirm','--workpath',str(project/'build'/f'release-{APP_VERSION}'),'HocVet.spec']):
         subprocess.run(command, cwd=project, check=True)
     verify_bundled_sources(project)

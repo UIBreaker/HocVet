@@ -20,6 +20,7 @@ import math
 import shutil
 import tempfile
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Callable
@@ -27,7 +28,21 @@ from typing import List, Dict, Any, Optional, Callable
 from pynput import mouse, keyboard
 from app_info import APP_VERSION
 from clipboard_text import set_clipboard_text
+from conditions import foreground_window, title_matches, window_at, window_title
 from shortcuts import SHORTCUT_ACTIONS, normalize_hotkey, validate_shortcuts, parse_hotkey, key_identity, hotkey_identities
+
+
+_playback_input = threading.local()
+
+
+def _check_send_result(result, _function, args):
+    if getattr(_playback_input, 'active', False) and result != args[0]:
+        raise OSError('Windows chưa xác nhận gửi đủ sự kiện đầu vào.')
+    return result
+
+
+# Pynput bỏ qua số sự kiện SendInput đã gửi, kể cả khi Windows trả về 0.
+ctypes.windll.user32.SendInput.errcheck = _check_send_result
 
 
 def condition_check(action):
@@ -426,18 +441,30 @@ class MacroRecorder:
 # ==========================================
 # 6. PLAYER: BỘ THỰC HIỆN THAO TÁC (REPLAY)
 # ==========================================
+class PlaybackBlocked(RuntimeError):
+    def __init__(self, reason, message):
+        super().__init__(message)
+        self.reason = reason
+
+
 class MacroPlayer:
     def __init__(self):
         self.mouse_controller = mouse.Controller()
         self.keyboard_controller = keyboard.Controller()
         self.is_playing = False
         self._abort_event = threading.Event()
+        self._resume_event = threading.Event()
         self._play_thread: Optional[threading.Thread] = None
 
         # Callbacks
         self.on_step: Optional[Callable[[int, int, int, int], None]] = None
         self.on_finished: Optional[Callable[[bool, bool], None]] = None
         self.on_wait: Optional[Callable[[str], None]] = None
+        self.on_paused = None
+        self.on_resumed = None
+        self.pause = None
+        self.log_path = None
+        self.script_name = ''
         self.last_error = ''
         self.protect_mouse = None
         self.protect_keyboard = None
@@ -447,41 +474,133 @@ class MacroPlayer:
         self.current_loop = 1
         self.data_start_row = None
         self._held_buttons = set()
+        self._held_keys = set()
+        self._guarded = False
+        self._target_window = None
+        self._step_window = None
+        self._sent_to = None
 
     def is_running(self) -> bool:
         return self.is_playing
 
     def stop(self):
         """Dừng khẩn cấp ngay lập tức."""
-        if not self.is_playing:
+        if not self.is_playing or self._abort_event.is_set():
             return
         self._abort_event.set()
+        self._resume_event.set()
         play_sound("emergency_stop")
-        self._release_all_modifiers()
 
-    def _release_all_modifiers(self):
+    def resume(self):
+        if self.pause and not self._abort_event.is_set():
+            self._resume_event.set()
+
+    def _release_held_input(self):
+        for held, controller in ((self._held_buttons, self.mouse_controller),
+                                 (self._held_keys, self.keyboard_controller)):
+            for key in tuple(held):
+                try:
+                    controller.release(key)
+                except Exception:
+                    pass
+            held.clear()
+
+    def _log_event(self, event, step, reason):
+        if self.log_path is None:
+            return
+        entry = dict(time=datetime.now().astimezone().isoformat(timespec='milliseconds'),
+                     script=self.script_name, step=step, event=event, reason=reason)
         try:
-            for btn in (mouse.Button.left, mouse.Button.right, mouse.Button.middle):
-                self.mouse_controller.release(btn)
-        except Exception:
-            pass
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.log_path.open('a', encoding='utf-8') as log:
+                log.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        except OSError:
+            print('Không thể ghi nhật ký phát lại Học Vẹt.', file=sys.stderr)
 
-        for button in tuple(self._held_buttons):
-            try:
-                self.mouse_controller.release(button)
-            except Exception:
-                pass
-            self._held_buttons.discard(button)
-        modifier_keys = [
-            keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
-            keyboard.Key.alt_l, keyboard.Key.alt_r,
-            keyboard.Key.shift_l, keyboard.Key.shift_r,
-        ]
-        for k in modifier_keys:
-            try:
-                self.keyboard_controller.release(k)
-            except Exception:
-                pass
+    def _pause_at(self, step, total, error, uncertain):
+        self._resume_event.clear()
+        if self._abort_event.is_set():
+            return False
+        detail = str(error)
+        if uncertain:
+            self._release_held_input()
+            detail += ' Hãy kiểm tra kết quả trên cửa sổ đích. Tiếp tục sẽ kết thúc lượt chạy.'
+        self.pause = (self.script_name, step, total, detail)
+        self._log_event('paused', step, error.reason)
+        if self.on_paused:
+            self.on_paused(*self.pause)
+        self._resume_event.wait()
+        self.pause = None
+        if self._abort_event.is_set():
+            return False
+        self._log_event('resume_requested', step, error.reason)
+        if uncertain:
+            self.last_error = detail
+            return False
+        return True
+
+    def _check_target(self, action, point=None):
+        if self._abort_event.is_set():
+            raise InterruptedError
+        if point is not None and self.protect_mouse and self.protect_mouse(*point):
+            raise PlaybackBlocked('panel_at_point', 'Tọa độ chạm bảng Học Vẹt. Hãy kéo bảng ra khỏi vị trí thao tác.')
+        foreground = foreground_window() if self._guarded else None
+        if (self._guarded or point is None) and self.protect_keyboard and self.protect_keyboard():
+            raise PlaybackBlocked('panel_has_focus', 'Học Vẹt đang nhận tiêu điểm. Hãy chọn cửa sổ đích.')
+        if not self._guarded:
+            return None
+        if not foreground:
+            raise PlaybackBlocked('no_foreground', 'Không có cửa sổ đích đang nhận tiêu điểm.')
+        if action.window_title:
+            expected = action.window_title
+            if not title_matches(expected, window_title(foreground)):
+                raise PlaybackBlocked('title_mismatch', f'Cửa sổ phía trước không khớp với “{expected}”.')
+        expected_window = self._step_window or (None if action.window_title else self._target_window)
+        if expected_window and foreground != expected_window:
+            raise PlaybackBlocked('focus_changed', 'Cửa sổ đích đã mất tiêu điểm. Hãy chọn lại cửa sổ đích.')
+        if point is not None and window_at(*point) != foreground:
+            raise PlaybackBlocked('wrong_mouse_window', 'Tọa độ thao tác nằm trên cửa sổ khác. Hãy đưa cửa sổ đích ra trước.')
+        if foreground_window() != foreground:
+            raise PlaybackBlocked('focus_changed', 'Cửa sổ đích đã mất tiêu điểm. Hãy chọn lại cửa sổ đích.')
+        self._target_window = foreground
+        self._step_window = foreground
+        return foreground
+
+    def _send_input(self, action, method, value, *, point=None, held=None, pressed=None):
+        target = self._check_target(action, point)
+        if point is not None and self.mouse_controller.position != point:
+            raise PlaybackBlocked('cursor_moved', 'Con trỏ đã rời tọa độ thao tác. Hãy thử tiếp tục.')
+        if self._abort_event.is_set():
+            raise InterruptedError
+        self._sent_to = target
+        if held is not None and pressed:
+            held.add(value)
+        method(value)
+        if held is not None and not pressed:
+            held.discard(value)
+
+    def _wait_for_condition(self, action, retry):
+        if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
+            raise ValueError('Thời gian chờ phải từ 0 đến 3600 giây.')
+        check = condition_check(action)
+        window_wait = action.action_type == 'wait_window'
+        label = f'cửa sổ “{action.window_title}”' if window_wait else f'ảnh / nút mẫu tại ({action.x}, {action.y})'
+        if self.on_wait and not retry:
+            self.on_wait(f'ĐANG CHỜ · {label} · Tối đa {action.timeout:g} giây')
+        deadline = time.monotonic() + action.timeout
+        while not self._abort_event.is_set():
+            if window_wait:
+                foreground = foreground_window()
+                if foreground and check(foreground) and foreground_window() == foreground:
+                    self._target_window = foreground
+                    return
+            elif check():
+                return
+            remaining = deadline - time.monotonic()
+            if retry or remaining <= 0:
+                detail = f'Vẫn chưa tìm thấy {label}.' if retry else f'Không tìm thấy {label} sau {action.timeout:g} giây.'
+                raise PlaybackBlocked(f'{action.action_type}_timeout', detail)
+            self._abort_event.wait(min(0.2, remaining))
 
     def play_async(
         self,
@@ -489,11 +608,13 @@ class MacroPlayer:
         speed: float = 1.0,
         loop_count: int = 1,
         loop_delay: float = 1.0,
+        *, script_name: str = '',
     ):
         if self.is_playing:
             return
         self.data_start_row=next((action.data_row for action in actions if action.action_type in ('copy_field','paste_date')),None)
         self._abort_event.clear()
+        self.script_name = script_name
         self.last_error = ''
         self.is_playing = True
         self._play_thread = threading.Thread(
@@ -513,135 +634,159 @@ class MacroPlayer:
         total_steps = len(actions)
         speed = max(1.0, min(10.0, speed))
         current_loop = 1
-        aborted = False
+        idx = 1
+        stop_reason = 'user_stop'
+        completed = False
+        self._guarded = True
+        _playback_input.active = True
 
         play_sound("start_play")
 
         try:
+            self._target_window = None if self.protect_keyboard and self.protect_keyboard() else foreground_window()
             while not self._abort_event.is_set():
                 self.current_loop = current_loop
                 for idx, action in enumerate(actions, start=1):
-                    if self._abort_event.is_set():
-                        aborted = True
-                        break
-
-                    actual_delay = action.delay / speed
-                    if actual_delay > 0:
-                        if self._abort_event.wait(actual_delay):
-                            aborted = True
-                            break
-
+                    if self._abort_event.wait(max(0, action.delay / speed)):
+                        return
                     if self.on_step:
                         self.on_step(idx, total_steps, current_loop, loop_count)
-                    self._execute_action(action)
+                    next_action = actions[idx] if idx < total_steps else (
+                        actions[0] if not loop_count or current_loop < loop_count else None)
+                    retry = False
+                    while not self._abort_event.is_set():
+                        self._sent_to = self._step_window = None
+                        try:
+                            self._run_step(action, next_action, retry)
+                        except PlaybackBlocked as error:
+                            uncertain = bool(self._sent_to or self._held_buttons or self._held_keys)
+                            if not self._pause_at(idx, total_steps, error, uncertain):
+                                stop_reason = f'user_stop_while_paused:{error.reason}' if self._abort_event.is_set() else 'uncertain_input'
+                                return
+                            retry = True
+                        else:
+                            if retry and not self._abort_event.is_set():
+                                self._log_event('resumed', idx, 'condition_met')
+                                if self.on_resumed:
+                                    self.on_resumed()
+                            break
                     if self._abort_event.is_set():
-                        aborted = True
-                        break
-
-                if aborted:
-                    break
+                        if action.action_type in ('wait_window', 'wait_image'):
+                            stop_reason = f'user_stop_during_{action.action_type}'
+                        return
 
                 if loop_count > 0 and current_loop >= loop_count:
+                    completed = True
                     break
 
                 current_loop += 1
                 if loop_delay > 0:
                     if self._abort_event.wait(loop_delay):
-                        aborted = True
-                        break
+                        return
 
+        except InterruptedError:
+            if not self._abort_event.is_set():
+                self.last_error = 'Không thể hoàn tất thao tác phát lại.'
+                stop_reason = 'playback_error'
         except Exception as ex:
             self.last_error = str(ex)
-            print(f"Lỗi khi thực hiện thao tác: {ex}", file=sys.stderr)
-            aborted = True
+            stop_reason = 'playback_error'
         finally:
-            self._release_all_modifiers()
+            self._release_held_input()
+            _playback_input.active = False
             if self.on_input_finished:
                 try:
                     self.on_input_finished()
                 except Exception as error:
                     self.last_error = str(error)
-                    aborted = True
+                    completed = False
+                    stop_reason = 'input_cleanup_failed'
+            if self._abort_event.is_set() or not completed:
+                self._log_event('stopped', idx, stop_reason)
+            success = completed and not self._abort_event.is_set()
+            self._guarded = False
+            self.pause = None
             self.field_reader = None
             self.is_playing = False
-            if not aborted:
+            if success:
                 play_sound("stop_play")
             if self.on_finished:
-                self.on_finished(not aborted, aborted)
+                self.on_finished(success, not success)
+
+    def _run_step(self, action, next_action, retry):
+        if action.action_type in ('wait_window', 'wait_image'):
+            self._wait_for_condition(action, retry)
+            return
+        try:
+            self._execute_action(action)
+            if self._sent_to and not self._abort_event.is_set():
+                foreground = foreground_window()
+                if foreground != self._sent_to and not (
+                        foreground and next_action and next_action.window_title
+                        and title_matches(next_action.window_title, window_title(foreground))):
+                    raise PlaybackBlocked('focus_changed_after_send', 'Tiêu điểm đã đổi trong lúc gửi thao tác.')
+        except PlaybackBlocked:
+            raise
+        except Exception as error:
+            if self._sent_to and not self._abort_event.is_set():
+                raise PlaybackBlocked('send_uncertain', 'Chưa xác nhận được kết quả thao tác đã gửi.') from error
+            raise
 
     def _execute_action(self, action: MacroAction):
         act_type = action.action_type
-        if act_type.startswith('mouse_') and self.protect_mouse:
-            point = (action.x, action.y) if action.x is not None and action.y is not None else self.mouse_controller.position
-            if self.protect_mouse(*point):
-                raise RuntimeError('Tọa độ kịch bản chạm bảng Học Vẹt. Đã dừng trước thao tác; kéo bảng sang vị trí khác rồi chạy lại.')
-        if act_type in ('key_press', 'key_release','paste_date') and self.protect_keyboard and self.protect_keyboard():
-            raise RuntimeError('Học Vẹt đang nhận bàn phím. Đã dừng để bảo vệ bảng điều khiển; chọn lại cửa sổ công việc rồi chạy.')
+        if act_type == 'paste_date':
+            target = self._check_target(action)
 
         if act_type in ('copy_field','paste_date'):
             if not self.field_reader: raise RuntimeError('Chưa có bảng dữ liệu cho kịch bản HIS.')
             value=self.field_reader(action.data_field,action.data_row+self.current_loop-1)
             if act_type=='paste_date':
                 from date_paste import paste_date
-                # Ctrl vật lý có thể đã được ghi trước bước dán ngày.
                 for key in (keyboard.Key.ctrl_l,keyboard.Key.ctrl_r):
-                    self.keyboard_controller.release(key)
-                paste_date(value,self.keyboard_controller,self._abort_event,self.protect_keyboard,
+                    if key in self._held_keys:
+                        self._send_key(action, self.keyboard_controller.release, key)
+                def protect():
+                    self._check_target(action)
+                    return False
+                paste_date(value,self.keyboard_controller,self._abort_event,protect,target=target,
+                    send=lambda method, key: self._send_key(action, method, key),
                     navigation=getattr(self.field_reader,'date_navigation',{}).get(action.data_field,'tab'))
             else:set_clipboard_text(value,self._abort_event)
             if self.on_field_copied:
                 self.on_field_copied(getattr(self.field_reader,'environment_id',None),
                     getattr(self.field_reader,'field_ids',{}).get(action.data_field,action.data_field),action.data_row+self.current_loop-1)
-        elif act_type in ('wait_window', 'wait_image'):
-            if not math.isfinite(action.timeout) or not 0 < action.timeout <= 3600:
-                raise ValueError('Thời gian chờ phải từ 0 đến 3600 giây.')
-            check = condition_check(action)
-            label = action.window_title if act_type == 'wait_window' else f'ảnh tại ({action.x}, {action.y})'
-            if self.on_wait:
-                self.on_wait(f'ĐANG CHỜ: {label} (tối đa {action.timeout:g}s)')
-            deadline = time.monotonic() + action.timeout
-            while not self._abort_event.is_set():
-                if check():
-                    return
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(f'Hết {action.timeout:g}s chờ {label}. Kịch bản đã dừng trước bước tiếp theo.')
-                if self._abort_event.wait(min(0.2, remaining)):
-                    return
+        elif act_type.startswith('mouse_'):
+            controller = self.mouse_controller
+            point = (action.x, action.y) if action.x is not None and action.y is not None else None
+            if point is not None:
+                target = self._check_target(action, point)
+                if self._abort_event.is_set():
+                    raise InterruptedError
+                if act_type == 'mouse_move' or self._held_buttons:
+                    self._sent_to = target
+                controller.position = point
+            if act_type in ('mouse_click', 'mouse_scroll'):
+                position = controller.position
+                if position is None:
+                    raise PlaybackBlocked('cursor_unavailable', 'Không đọc được vị trí con trỏ chuột.')
+                if point is not None and position != point:
+                    raise PlaybackBlocked('cursor_moved', 'Con trỏ đã rời tọa độ thao tác. Hãy thử tiếp tục.')
+            if act_type == 'mouse_click':
+                button = str_to_button(action.button or 'left')
+                method = controller.press if action.pressed else controller.release
+                self._send_input(action, method, button, point=position,
+                                 held=self._held_buttons, pressed=action.pressed)
+            elif act_type == 'mouse_scroll':
+                self._send_input(action, lambda delta: controller.scroll(*delta),
+                                 (action.dx or 0, action.dy or 0), point=position)
+        elif act_type in ('key_press', 'key_release') and action.key:
+            key = str_to_key(action.key)
+            if key is not None:
+                controller = self.keyboard_controller
+                self._send_key(action, controller.press if act_type == 'key_press' else controller.release, key)
 
-        elif act_type == "mouse_click":
-            if action.x is not None and action.y is not None:
-                self.mouse_controller.position = (action.x, action.y)
-            btn = str_to_button(action.button or "left")
-            if action.pressed:
-                self.mouse_controller.press(btn)
-                self._held_buttons.add(btn)
-            else:
-                self.mouse_controller.release(btn)
-                self._held_buttons.discard(btn)
-
-        elif act_type == "mouse_move":
-            if action.x is not None and action.y is not None:
-                self.mouse_controller.position = (action.x, action.y)
-
-        elif act_type == "mouse_scroll":
-            if action.x is not None and action.y is not None:
-                self.mouse_controller.position = (action.x, action.y)
-            dx = action.dx or 0
-            dy = action.dy or 0
-            self.mouse_controller.scroll(dx, dy)
-
-        elif act_type == "key_press":
-            if action.key:
-                k = str_to_key(action.key)
-                if k is not None:
-                    self.keyboard_controller.press(k)
-
-        elif act_type == "key_release":
-            if action.key:
-                k = str_to_key(action.key)
-                if k is not None:
-                    self.keyboard_controller.release(k)
+    def _send_key(self, action, method, key):
+        self._send_input(action, method, key, held=self._held_keys, pressed=method == self.keyboard_controller.press)
 
 
 # ==========================================
@@ -862,6 +1007,7 @@ class MacroManager:
     STATE_COUNTDOWN = 'countdown'
     STATE_RECORDING = "recording"
     STATE_PLAYING = "playing"
+    STATE_PAUSED = "paused"
 
     def __init__(self, library_path: Optional[str] = None):
         self.state = self.STATE_IDLE
@@ -869,6 +1015,7 @@ class MacroManager:
         self.player = MacroPlayer()
 
         self.library_path = library_path if library_path is not None else MacroStorage.default_library_path()
+        self.player.log_path = Path(self.library_path).with_name('playback_events.jsonl')
         self.profiles: List[ScriptProfile] = []
         self.active_profile_id: Optional[str] = None
 
@@ -902,11 +1049,15 @@ class MacroManager:
         self.on_action_recorded: Optional[Callable[[MacroAction, int], None]] = None
         self.on_step: Optional[Callable[[int, int, int, int], None]] = None
         self.on_play_finished: Optional[Callable[[bool, bool], None]] = None
+        self.on_play_paused = None
+        self.on_play_resumed = None
         self.on_profile_triggered: Optional[Callable[[ScriptProfile], None]] = None
 
         self.recorder.on_action_recorded = self._handle_action_recorded
         self.player.on_step = self._handle_step
         self.player.on_finished = self._handle_play_finished
+        self.player.on_paused = self._handle_play_paused
+        self.player.on_resumed = self._handle_play_resumed
 
         # Tải thư viện kịch bản đã lưu
         self.load_library()
@@ -1161,6 +1312,7 @@ class MacroManager:
             speed=profile.speed,
             loop_count=loops,
             loop_delay=profile.loop_delay,
+            script_name=profile.name,
         )
 
     def start_playing_active(self):
@@ -1168,8 +1320,12 @@ class MacroManager:
         if active:
             self.start_playing_profile(active)
 
+    def resume_playing(self):
+        if self.state == self.STATE_PAUSED:
+            self.player.resume()
+
     def stop_playing(self):
-        if self.state == self.STATE_PLAYING:
+        if self.state in (self.STATE_PLAYING, self.STATE_PAUSED):
             self.player.stop()
         elif self.state == self.STATE_RECORDING:
             self.stop_recording()
@@ -1181,6 +1337,16 @@ class MacroManager:
     def _handle_step(self, step: int, total: int, cur_loop: int, total_loops: int):
         if self.on_step:
             self.on_step(step, total, cur_loop, total_loops)
+
+    def _handle_play_paused(self, *pause):
+        self._set_state(self.STATE_PAUSED)
+        if self.on_play_paused:
+            self.on_play_paused(*pause)
+
+    def _handle_play_resumed(self):
+        self._set_state(self.STATE_PLAYING)
+        if self.on_play_resumed:
+            self.on_play_resumed()
 
     def _handle_play_finished(self, success: bool, aborted: bool):
         self._set_state(self.STATE_IDLE)

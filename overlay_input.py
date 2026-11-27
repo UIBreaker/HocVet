@@ -1,4 +1,4 @@
-"""Cho thao tác phát xuyên bảng; chỉ chuột thật được bấm Dừng trên bảng."""
+"""Cho thao tác phát xuyên bảng; nhận Dừng và Tiếp tục từ chuột thật."""
 import ctypes
 from ctypes import wintypes
 import threading
@@ -17,7 +17,9 @@ class OverlayInput:
         self._swallowed = set()
         self._drained = threading.Event()
         self.bounds = self.stop_bounds = (0,0,0,0)
+        self.resume_bounds = (0,0,0,0)
         self.on_stop = lambda:None
+        self.on_resume = lambda:None
         self.allow_stop = True
         self.close_bounds=self.drag_bounds=(0,0,0,0)
         self.on_hide=lambda:None
@@ -60,6 +62,7 @@ class OverlayInput:
             if message==0x201:
                 if self.contains(self.close_bounds,x,y):self.on_hide()
                 elif self.contains(self.drag_bounds,x,y):self._dragging=True;self.on_drag_start(x,y)
+                elif self.contains(self.resume_bounds,x,y):self.on_resume()
                 elif self.allow_stop and self.contains(self.stop_bounds,x,y):self.on_stop()
             self.listener.suppress_event()
         if message in (0x202,0x205,0x208,0x20C,0x20A,0x20E):
@@ -74,6 +77,7 @@ class OverlayInput:
         if self.active: return
         self.hwnd = hwnd
         self.bounds,self.stop_bounds = bounds,stop_bounds
+        self.resume_bounds = (0,0,0,0)
         self.on_stop,self.allow_stop = on_stop,allow_stop
         self._style = self.user.GetWindowLongPtrW(hwnd,-20)
         self.active = True

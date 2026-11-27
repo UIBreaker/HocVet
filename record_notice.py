@@ -31,6 +31,8 @@ class RecordNotice:
         self.on_environment = None
         self.hidden=False;self.on_hide=None;self.on_geometry=None
         self.moving=False
+        self.paused = False
+        self.on_resume = None
 
     def pin(self, profiles, on_run, on_stop, on_open, activation='mouse', *, on_repeat=None, on_speed=None, size=None, on_resize=None):
         self.pinned = True
@@ -39,8 +41,11 @@ class RecordNotice:
         self.on_run, self.on_stop, self.on_open = on_run, on_stop, on_open
         self.on_repeat, self.on_speed, self.on_resize = on_repeat, on_speed, on_resize
         if size is not None: self.size = tuple(size)
-        self.show('HỌC VẸT · BẢNG ĐIỀU KHIỂN', 'Chọn kịch bản bên dưới để chạy.' if activation=='mouse'
-            else 'Dùng phím đã gán để Học / Chạy / Dừng. Các nút kích hoạt bằng chuột đang khóa.', progress=0)
+        if self.paused:
+            self.show(self.title.cget('text'), self.message.cget('text'))
+        else:
+            self.show('HỌC VẸT · BẢNG ĐIỀU KHIỂN', 'Chọn kịch bản bên dưới để chạy.' if activation=='mouse'
+                else 'Dùng phím đã gán để Học / Chạy / Dừng. Các nút kích hoạt bằng chuột đang khóa.', progress=0)
 
     def update_profiles(self, profiles):
         self.profiles = list(profiles)
@@ -102,6 +107,7 @@ class RecordNotice:
             count = profile.loop_count if profile else 1
             for caption, value in (('−',max(0,count-1)), ('Liên tục' if count==0 else f'{count} lần',None), ('+',count+1)):
                 edit = ttk.Button(repeats,text=caption,width=9 if value is None else 3,takefocus=False,
+                    style='Readout.TButton' if value is None else 'TButton',
                     command=lambda p=profile,v=value:self.on_repeat(p.id,v) if p and self.on_repeat else None)
                 edit.pack(side='left',padx=(0,4))
                 edit.configure(state='disabled' if self.busy or not profile or not self.on_repeat else 'normal')
@@ -114,6 +120,7 @@ class RecordNotice:
             next_spd = min(10.0, round(spd + 1.0, 1))
             for caption, value in (('−',prev_spd), (f'{spd:g}×',None), ('+',next_spd)):
                 btn = ttk.Button(speeds,text=caption,width=9 if value is None else 3,takefocus=False,
+                    style='Readout.TButton' if value is None else 'TButton',
                     command=lambda p=profile,v=value:self.on_speed(p.id,v) if p and self.on_speed else None)
                 btn.pack(side='left',padx=(0,4))
                 is_disabled = (
@@ -161,7 +168,7 @@ class RecordNotice:
         if self._layout_timer:
             self.root.after_cancel(self._layout_timer)
         self._layout_timer = None
-        if not self.window or not self.pinned or not self.launcher or not self.window.winfo_ismapped(): return
+        if self.paused or not self.window or not self.pinned or not self.launcher or not self.window.winfo_ismapped(): return
         if self._fitting:return
         self._fitting=True
         try:
@@ -281,7 +288,7 @@ class RecordNotice:
             win.withdraw()
             win.overrideredirect(True)
             win.attributes('-topmost', True)
-            win.configure(bg='#b9b0a1', padx=2, pady=2)
+            win.configure(bg=VINTAGE_CARD_BORDER, padx=2, pady=2)
             win.bind('<Configure>',self._queue_layout)
             win.bind('<MouseWheel>', lambda event: self._page(-1 if event.delta > 0 else 1) if self.pinned else None)
             panel = tk.Frame(win, bg=VINTAGE_BG, padx=18, pady=14)
@@ -306,6 +313,13 @@ class RecordNotice:
                                     font=FONT_BODY, wraplength=290, justify='left', anchor='w')
             self.message.pack(fill='x', pady=(4, 0))
             self.progress = ttk.Progressbar(content, maximum=100, length=280)
+            self.pause_controls = ttk.Frame(content)
+            self.resume_button = ttk.Button(self.pause_controls, text='Tiếp tục', style='Primary.TButton',
+                takefocus=False, command=lambda: self.on_resume())
+            self.pause_stop_button = ttk.Button(self.pause_controls, text='Dừng', style='Danger.TButton',
+                takefocus=False, command=lambda: self.on_stop())
+            self.resume_button.pack(side='left')
+            self.pause_stop_button.pack(side='right')
         self.title.configure(text=f'{title} · {number}' if self.pinned and number is not None else title)
         self.message.configure(text=message)
         self.number.configure(text=str(number) if number is not None else '●')
@@ -314,12 +328,18 @@ class RecordNotice:
             self.content.pack_forget()
             self.content.pack(fill='x')
             self.title.configure(height=2)
-            self.message.configure(height=2)
             self.launcher = tk.Frame(self.panel, bg=VINTAGE_BG)
             self.launcher.pack(fill='both',expand=True)
             self._render_profiles()
             self._add_resize_handles()
-        if progress is None and not self.pinned:
+        if self.paused:
+            self.launcher.pack_forget()
+            self.pause_controls.pack(fill='x', pady=(10, 0))
+        else:
+            self.pause_controls.pack_forget()
+            if self.pinned and not self.launcher.winfo_manager():
+                self.launcher.pack(fill='both', expand=True)
+        if self.paused or progress is None and not self.pinned:
             self.progress.pack_forget()
         else:
             self.progress.configure(value=max(0, min(100, progress or 0)))
@@ -340,7 +360,14 @@ class RecordNotice:
         set_style(hwnd, -20, get_style(hwnd, -20) | 0x08000000 | 0x80)
         work = self._work_area(*self.position) if self.position and self.pinned else self._work_area()
         width, height = win.winfo_reqwidth(), win.winfo_reqheight()
-        if self.size and self.pinned:
+        if self.paused:
+            scale = self.root.winfo_fpixels('1i') / 96
+            width = min(work.right-work.left, max(round(340*scale), self.size[0] if self.size else width))
+            for label in (self.title, self.message):
+                label.configure(wraplength=max(100, width-round(64*scale)))
+            win.update_idletasks()
+            height = win.winfo_reqheight()
+        elif self.size and self.pinned:
             scale=self.root.winfo_fpixels('1i')/96
             width=min(work.right-work.left,max(round(320*scale),self.size[0]))
             minimum=(self._chrome_height+self._row_height) if self._row_height is not None else 340
@@ -381,5 +408,6 @@ class RecordNotice:
             self.window.destroy()
         self.window = None
         self.launcher = None
+        self.paused = False
         self._row_height = self._chrome_height = None
         if force: self.pinned = False
